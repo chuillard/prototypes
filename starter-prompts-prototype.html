@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Starter Prompts — Gorgias Prototype</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #F7F6F3; }
+    @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    input:focus { outline: none; border-color: #7C3AED !important; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    // ── Design Tokens ──────────────────────────────────────
+    const t = {
+      purple: "#7C3AED", purpleLight: "#EDE9FE", accent: "#7C3AED",
+      text: "#111827", textSec: "#6B7280", textMuted: "#9CA3AF",
+      border: "#E5E7EB", borderLight: "#F3F4F6",
+      bgPage: "#F7F6F3", white: "#FFFFFF",
+      green: "#059669", red: "#EF4444",
+    };
+
+    const MAX_PROMPTS = 3;
+
+    // ════════════════════════════════════════════════════════
+    // LEFT SIDEBAR — Settings Navigation
+    // ════════════════════════════════════════════════════════
+
+    function SettingsSidebar() {
+      const sections = [
+        {
+          label: "Productivity", icon: "⚡", items: [],
+          collapsed: true,
+        },
+        {
+          label: "Ticket & customer data", icon: "🏷", items: [],
+          collapsed: true,
+        },
+        {
+          label: "Ticket management", icon: "📋", items: [],
+          collapsed: true,
+        },
+        {
+          label: "Channels", icon: "📡", items: [
+            { label: "Chat", active: true },
+            { label: "Email" },
+            { label: "Help Center" },
+            { label: "Phone numbers" },
+            { label: "Voice" },
+            { label: "SMS" },
+            { label: "Contact form" },
+          ],
+        },
+        {
+          label: "Apps", icon: "🧩", items: [],
+          collapsed: true,
+        },
+        {
+          label: "Account", icon: "👤", items: [],
+          collapsed: true,
+        },
+        {
+          label: "Advanced", icon: "⚙️", items: [],
+          collapsed: true,
+        },
+        {
+          label: "Profile", icon: "🙂", items: [],
+          collapsed: true,
+        },
+      ];
+
+      return (
+        <div style={{
+          width: 240, background: t.white, borderRight: `1px solid ${t.border}`,
+          display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto",
+        }}>
+          {/* Header */}
+          <div style={{ padding: "16px 16px 12px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M4 6h16M4 12h16M4 18h16" stroke={t.text} strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+            <span style={{ fontSize: 15, fontWeight: 700, color: t.text }}>Settings</span>
+          </div>
+
+          {/* Nav Sections */}
+          <div style={{ padding: "8px 8px", flex: 1 }}>
+            {sections.map((section) => (
+              <div key={section.label} style={{ marginBottom: 2 }}>
+                {/* Section header */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "8px 8px", borderRadius: 6, cursor: "pointer",
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    {section.collapsed
+                      ? <path d="M6 4l4 4-4 4" stroke={t.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      : <path d="M4 6l4 4 4-4" stroke={t.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    }
+                  </svg>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{section.label}</span>
+                </div>
+
+                {/* Items */}
+                {!section.collapsed && section.items.map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      padding: "7px 8px 7px 32px",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 14,
+                      color: item.active ? t.purple : t.text,
+                      fontWeight: item.active ? 600 : 400,
+                      background: item.active ? t.purpleLight : "transparent",
+                    }}
+                  >
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom icons */}
+          <div style={{ padding: "12px 16px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, cursor: "pointer" }}>⚙</div>
+            <div style={{ width: 28, height: 28, borderRadius: "50%", background: t.purpleLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "linear-gradient(135deg, #a78bfa, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>CH</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+
+    // ════════════════════════════════════════════════════════
+    // FLOWS CARD
+    // ════════════════════════════════════════════════════════
+
+    function FlowsCard() {
+      const [flows] = useState([
+        "Tennis Racket Finder",
+        "Can I adjust my order?",
+        "How can I get 10% off my first order?",
+        "How long does shipping take?",
+        "Warranty",
+      ]);
+
+      return (
+        <div style={{
+          background: t.white, borderRadius: 12,
+          border: `1px solid ${t.border}`, padding: "24px",
+        }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: t.text, margin: "0 0 6px 0" }}>Flows</h3>
+          <p style={{ fontSize: 14, color: t.textSec, margin: "0 0 20px 0" }}>
+            Show up to 6 flows on your chat to proactively resolve top customer requests.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {flows.map((flow, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "12px 12px",
+                  borderBottom: i < flows.length - 1 ? `1px solid ${t.borderLight}` : "none",
+                }}
+              >
+                {/* Drag handle */}
+                <div style={{ color: t.textMuted, cursor: "grab", fontSize: 14, letterSpacing: 1, lineHeight: 1 }}>
+                  <svg width="12" height="16" viewBox="0 0 12 16" fill="none">
+                    <circle cx="3" cy="3" r="1.5" fill="#9CA3AF"/>
+                    <circle cx="9" cy="3" r="1.5" fill="#9CA3AF"/>
+                    <circle cx="3" cy="8" r="1.5" fill="#9CA3AF"/>
+                    <circle cx="9" cy="8" r="1.5" fill="#9CA3AF"/>
+                    <circle cx="3" cy="13" r="1.5" fill="#9CA3AF"/>
+                    <circle cx="9" cy="13" r="1.5" fill="#9CA3AF"/>
+                  </svg>
+                </div>
+
+                {/* Flow name */}
+                <span style={{ flex: 1, fontSize: 14, color: t.text }}>{flow}</span>
+
+                {/* Edit */}
+                <button style={{
+                  width: 32, height: 32, borderRadius: 6, border: "none",
+                  background: "transparent", cursor: "pointer", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={t.textMuted} strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={t.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+
+                {/* Delete */}
+                <button style={{
+                  width: 32, height: 32, borderRadius: 6, border: "none",
+                  background: "transparent", cursor: "pointer", display: "flex",
+                  alignItems: "center", justifyContent: "center", color: t.textMuted, fontSize: 18,
+                }}>×</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add flow */}
+          <div style={{ marginTop: 12 }}>
+            <button style={{
+              padding: "8px 16px", borderRadius: 8,
+              border: `1px solid ${t.border}`, background: t.white,
+              fontSize: 13, fontWeight: 500, color: t.text,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+            }}>
+              Add flow
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6l4 4 4-4" stroke={t.textSec} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+
+    // ════════════════════════════════════════════════════════
+    // STARTER PROMPTS CARD (NEW)
+    // ════════════════════════════════════════════════════════
+
+    function StarterPromptsCard({ prompts, setPrompts, enabled, setEnabled }) {
+      const updatePrompt = (index, value) => {
+        const next = [...prompts];
+        next[index] = value;
+        setPrompts(next);
+      };
+
+      const removePrompt = (index) => {
+        setPrompts(prompts.filter((_, i) => i !== index));
+      };
+
+      const addPrompt = () => {
+        if (prompts.length < MAX_PROMPTS) {
+          setPrompts([...prompts, ""]);
+        }
+      };
+
+      return (
+        <div style={{
+          background: t.white, borderRadius: 12,
+          border: `1px solid ${t.border}`, padding: "24px",
+        }}>
+          {/* Header row */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: t.text, margin: 0 }}>Starter prompts</h3>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
+                background: "#DBEAFE", color: "#1D4ED8", letterSpacing: "0.03em",
+              }}>NEW</span>
+            </div>
+
+            {/* Toggle */}
+            <div
+              onClick={() => setEnabled(!enabled)}
+              style={{
+                width: 44, height: 24, borderRadius: 12, cursor: "pointer",
+                background: enabled ? t.purple : "#D1D5DB",
+                position: "relative", transition: "background 0.2s", flexShrink: 0,
+              }}
+            >
+              <div style={{
+                position: "absolute", top: 3, left: enabled ? 23 : 3,
+                width: 18, height: 18, borderRadius: 9, background: "#fff",
+                transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }} />
+            </div>
+          </div>
+
+          <p style={{ fontSize: 14, color: t.textSec, margin: "0 0 20px 0", lineHeight: 1.5 }}>
+            Display up to {MAX_PROMPTS} starter prompts on your chat homepage. When a shopper clicks one, it triggers the <strong>AI Agent</strong> to answer automatically.
+          </p>
+
+          {enabled && (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {prompts.map((prompt, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "10px 12px",
+                      borderBottom: index < prompts.length - 1 ? `1px solid ${t.borderLight}` : "none",
+                    }}
+                  >
+                    {/* Drag handle */}
+                    <div style={{ color: t.textMuted, cursor: "grab", flexShrink: 0 }}>
+                      <svg width="12" height="16" viewBox="0 0 12 16" fill="none">
+                        <circle cx="3" cy="3" r="1.5" fill="#9CA3AF"/>
+                        <circle cx="9" cy="3" r="1.5" fill="#9CA3AF"/>
+                        <circle cx="3" cy="8" r="1.5" fill="#9CA3AF"/>
+                        <circle cx="9" cy="8" r="1.5" fill="#9CA3AF"/>
+                        <circle cx="3" cy="13" r="1.5" fill="#9CA3AF"/>
+                        <circle cx="9" cy="13" r="1.5" fill="#9CA3AF"/>
+                      </svg>
+                    </div>
+
+                    {/* Editable input */}
+                    <input
+                      type="text"
+                      value={prompt}
+                      onChange={(e) => updatePrompt(index, e.target.value)}
+                      placeholder="e.g. What's your return policy?"
+                      maxLength={80}
+                      style={{
+                        flex: 1, padding: "8px 12px",
+                        border: `1px solid ${t.border}`, borderRadius: 8,
+                        fontSize: 14, color: t.text,
+                        background: t.white,
+                      }}
+                    />
+
+                    {/* Char count */}
+                    <span style={{ fontSize: 11, color: t.textMuted, flexShrink: 0, minWidth: 36, textAlign: "right" }}>
+                      {prompt.length}/80
+                    </span>
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => removePrompt(index)}
+                      style={{
+                        width: 32, height: 32, borderRadius: 6, border: "none",
+                        background: "transparent", cursor: "pointer", display: "flex",
+                        alignItems: "center", justifyContent: "center",
+                        color: t.textMuted, fontSize: 18, flexShrink: 0,
+                      }}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add prompt button */}
+              {prompts.length < MAX_PROMPTS && (
+                <button
+                  onClick={addPrompt}
+                  style={{
+                    marginTop: 12, padding: "8px 16px", borderRadius: 8,
+                    border: `1px solid ${t.border}`, background: t.white,
+                    fontSize: 13, fontWeight: 500, color: t.text,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add starter prompt
+                </button>
+              )}
+
+              {/* Counter */}
+              <div style={{ marginTop: 8, fontSize: 12, color: t.textMuted }}>
+                {prompts.length} / {MAX_PROMPTS} prompts used
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+
+    // ════════════════════════════════════════════════════════
+    // ORDER MANAGEMENT CARD
+    // ════════════════════════════════════════════════════════
+
+    function OrderManagementCard() {
+      const [enabled, setEnabled] = useState(true);
+      return (
+        <div style={{
+          background: t.white, borderRadius: 12,
+          border: `1px solid ${t.border}`, padding: "24px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: t.text, margin: 0 }}>Order management</h3>
+            <div
+              onClick={() => setEnabled(!enabled)}
+              style={{
+                width: 44, height: 24, borderRadius: 12, cursor: "pointer",
+                background: enabled ? t.purple : "#D1D5DB",
+                position: "relative", transition: "background 0.2s",
+              }}
+            >
+              <div style={{
+                position: "absolute", top: 3, left: enabled ? 23 : 3,
+                width: 18, height: 18, borderRadius: 9, background: "#fff",
+                transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }} />
+            </div>
+          </div>
+          <p style={{ fontSize: 14, color: t.textSec, margin: "0 0 16px 0" }}>
+            Let customers sign in to track, return, cancel or report issues with orders.
+          </p>
+          <button style={{
+            padding: "8px 16px", borderRadius: 8,
+            border: `1px solid ${t.border}`, background: t.white,
+            fontSize: 13, fontWeight: 500, color: t.text,
+            cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={t.textSec} strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={t.textSec} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Edit order management
+          </button>
+        </div>
+      );
+    }
+
+
+    // ════════════════════════════════════════════════════════
+    // CHAT PREVIEW (right panel)
+    // ════════════════════════════════════════════════════════
+
+    function ChatPreview({ prompts, starterPromptsEnabled, flows }) {
+      const [messages, setMessages] = useState([]);
+      const [isTyping, setIsTyping] = useState(false);
+      const [inputValue, setInputValue] = useState("");
+      const messagesEndRef = useRef(null);
+      const activePrompts = prompts.filter((p) => p.trim() !== "");
+
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [messages, isTyping]);
+
+      const simulateAiResponse = (userMessage) => {
+        setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          const responses = {
+            "What's your return policy?": "We offer a 30-day hassle-free return policy on all unworn items. Simply start a return from your order page and we'll email you a prepaid shipping label. Refunds are processed within 3-5 business days after we receive your item.",
+            "Where's my order?": "I can help you track your order! Could you share your order number or the email address you used at checkout? I'll pull up the latest shipping status for you right away.",
+            "Do you offer free shipping?": "Yes! We offer free standard shipping on all orders over $50. Standard delivery takes 3-5 business days. Expedited shipping is available at checkout for $9.99 (1-2 business days).",
+          };
+          const reply = responses[userMessage] || `Great question about "${userMessage}"! Let me look into that for you. Based on our current policies, I can help with this. Would you like more details or would you prefer to speak with a team member?`;
+          setMessages((prev) => [...prev, { role: "ai", text: reply }]);
+        }, 1500);
+      };
+
+      const handleReset = () => {
+        setMessages([]);
+        setIsTyping(false);
+        setInputValue("");
+      };
+
+      const showHome = messages.length === 0;
+
+      return (
+        <div style={{
+          width: 340, flexShrink: 0, background: "#F9FAFB",
+          borderLeft: `1px solid ${t.border}`,
+          display: "flex", flexDirection: "column", height: "100vh",
+        }}>
+          {/* Preview header */}
+          <div style={{
+            padding: "14px 16px", borderBottom: `1px solid ${t.border}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: t.white,
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>Chat preview</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              {/* Home icon */}
+              <div style={{
+                width: 30, height: 30, borderRadius: 6, border: `1px solid ${t.border}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", background: t.white,
+              }} onClick={handleReset}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 10.5L12 3l9 7.5V21H15v-5h-6v5H3V10.5z" stroke={t.textSec} strokeWidth="1.7" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              {/* Refresh */}
+              <div style={{
+                width: 30, height: 30, borderRadius: 6, border: `1px solid ${t.border}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", background: t.white,
+              }} onClick={handleReset}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M1 4v6h6M23 20v-6h-6" stroke={t.textSec} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke={t.textSec} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Chat widget body */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {/* Brand header */}
+            <div style={{
+              background: "linear-gradient(180deg, #F5E6D0 0%, #EDD5B8 100%)",
+              padding: "32px 20px 20px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              position: "relative",
+            }}>
+              {/* Track orders button */}
+              <div style={{ position: "absolute", top: 12, right: 12, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: t.white, fontSize: 12, fontWeight: 500, color: t.text, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", cursor: "pointer" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <circle cx="9" cy="21" r="1" stroke={t.text} strokeWidth="1.5"/>
+                  <circle cx="20" cy="21" r="1" stroke={t.text} strokeWidth="1.5"/>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke={t.text} strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                Track orders
+              </div>
+
+              {/* Brand logo */}
+              <div style={{
+                fontSize: 36, fontWeight: 900, color: "#C41E3A",
+                fontFamily: "Georgia, serif", fontStyle: "italic",
+                textShadow: "1px 1px 0 rgba(0,0,0,0.05)",
+                letterSpacing: "-0.03em",
+              }}>
+                Wilson
+              </div>
+            </div>
+
+            {/* Chat content */}
+            <div style={{ flex: 1, overflowY: "auto", background: t.white }}>
+              {showHome ? (
+                <div style={{ padding: "16px 16px 20px" }}>
+                  {/* Flows section */}
+                  {flows && flows.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: starterPromptsEnabled && activePrompts.length > 0 ? 16 : 0 }}>
+                      {flows.map((flow, i) => (
+                        <button
+                          key={i}
+                          onClick={() => simulateAiResponse(flow)}
+                          style={{
+                            padding: "8px 14px", borderRadius: 20,
+                            border: `1px solid ${t.border}`, background: t.white,
+                            fontSize: 13, color: t.text, cursor: "pointer",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = t.purple;
+                            e.currentTarget.style.background = t.purpleLight;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = t.border;
+                            e.currentTarget.style.background = t.white;
+                          }}
+                        >
+                          {flow}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Starter prompts section */}
+                  {starterPromptsEnabled && activePrompts.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8, paddingLeft: 2 }}>
+                        ✦ Ask AI Agent
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {activePrompts.map((prompt, i) => (
+                          <button
+                            key={i}
+                            onClick={() => simulateAiResponse(prompt)}
+                            style={{
+                              padding: "10px 14px", borderRadius: 12,
+                              border: `1px solid ${t.border}`, background: t.white,
+                              fontSize: 13, color: t.text, cursor: "pointer",
+                              textAlign: "left", transition: "all 0.15s",
+                              display: "flex", alignItems: "center", gap: 8,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = t.purple;
+                              e.currentTarget.style.background = t.purpleLight;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = t.border;
+                              e.currentTarget.style.background = t.white;
+                            }}
+                          >
+                            <span style={{ fontSize: 14, opacity: 0.5 }}>⚡</span>
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {messages.map((msg, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                        animation: "fadeIn 0.25s ease-out",
+                      }}
+                    >
+                      <div style={{
+                        maxWidth: "85%", padding: "10px 14px",
+                        borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+                        background: msg.role === "user" ? t.text : "#F3F4F6",
+                        color: msg.role === "user" ? "#fff" : t.text,
+                        fontSize: 13, lineHeight: 1.5,
+                      }}>
+                        {msg.role === "ai" && (
+                          <div style={{ fontSize: 10, color: t.purple, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ fontSize: 10 }}>✦</span> AI Agent
+                          </div>
+                        )}
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  {isTyping && (
+                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                      <div style={{
+                        padding: "10px 14px", borderRadius: "14px 14px 14px 4px",
+                        background: "#F3F4F6", display: "flex", alignItems: "center", gap: 3,
+                      }}>
+                        <span style={{ animation: "pulse 1.2s infinite", fontSize: 16, color: t.textMuted }}>•</span>
+                        <span style={{ animation: "pulse 1.2s infinite 0.2s", fontSize: 16, color: t.textMuted }}>•</span>
+                        <span style={{ animation: "pulse 1.2s infinite 0.4s", fontSize: 16, color: t.textMuted }}>•</span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </div>
+
+            {/* Input bar */}
+            <div style={{ padding: "10px 14px", borderTop: `1px solid ${t.border}`, background: t.white, display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && inputValue.trim() && !isTyping) {
+                    simulateAiResponse(inputValue.trim());
+                    setInputValue("");
+                  }
+                }}
+                placeholder="Reply"
+                style={{
+                  flex: 1, padding: "8px 12px", border: "none",
+                  fontSize: 14, color: t.text, outline: "none", background: "transparent",
+                }}
+              />
+              <button style={{
+                width: 28, height: 28, borderRadius: 6, border: "none",
+                background: "transparent", cursor: "pointer", display: "flex",
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke={t.textMuted} strokeWidth="1.5"/>
+                  <circle cx="8.5" cy="8.5" r="1.5" fill={t.textMuted}/>
+                  <path d="M21 15l-5-5L5 21" stroke={t.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+
+    // ════════════════════════════════════════════════════════
+    // MAIN SETTINGS CONTENT
+    // ════════════════════════════════════════════════════════
+
+    function SettingsContent({ prompts, setPrompts, starterPromptsEnabled, setStarterPromptsEnabled }) {
+      const [activeTab, setActiveTab] = useState("automation");
+      const tabs = [
+        { id: "appearance", label: "Appearance" },
+        { id: "preferences", label: "Preferences" },
+        { id: "automation", label: "Automation" },
+        { id: "language", label: "Language" },
+        { id: "installation", label: "Installation" },
+      ];
+
+      return (
+        <div style={{ flex: 1, overflowY: "auto", background: "#FAFAF9" }}>
+          {/* Breadcrumb */}
+          <div style={{ padding: "12px 24px 0", fontSize: 13, color: t.textSec }}>
+            <span style={{ cursor: "pointer" }}>All chats</span>
+            <span style={{ margin: "0 6px", color: t.textMuted }}>›</span>
+            <span>Sol de Janeiro Support</span>
+          </div>
+
+          {/* Back + Title */}
+          <div style={{ padding: "12px 24px 0", display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8, border: `1px solid ${t.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", background: t.white,
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M15 18l-6-6 6-6" stroke={t.text} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: t.text, margin: 0 }}>Settings</h1>
+          </div>
+
+          {/* Tabs */}
+          <div style={{
+            padding: "0 24px", borderBottom: `1px solid ${t.border}`,
+            display: "flex", gap: 0, marginTop: 16,
+          }}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: "12px 16px", background: "none", border: "none",
+                  cursor: "pointer", fontSize: 14,
+                  fontWeight: activeTab === tab.id ? 600 : 400,
+                  color: activeTab === tab.id ? t.text : t.textSec,
+                  borderBottom: activeTab === tab.id ? "2px solid #111827" : "2px solid transparent",
+                  marginBottom: -1,
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          {activeTab === "automation" && (
+            <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 20, maxWidth: 680 }}>
+              <FlowsCard />
+              <StarterPromptsCard
+                prompts={prompts}
+                setPrompts={setPrompts}
+                enabled={starterPromptsEnabled}
+                setEnabled={setStarterPromptsEnabled}
+              />
+              <OrderManagementCard />
+            </div>
+          )}
+
+          {activeTab !== "automation" && (
+            <div style={{ padding: "60px 24px", textAlign: "center", color: t.textMuted, fontSize: 14 }}>
+              {tabs.find(t => t.id === activeTab)?.label} settings would appear here
+            </div>
+          )}
+        </div>
+      );
+    }
+
+
+    // ════════════════════════════════════════════════════════
+    // MAIN APP
+    // ════════════════════════════════════════════════════════
+
+    function App() {
+      const [prompts, setPrompts] = useState([
+        "What's your return policy?",
+        "Where's my order?",
+        "Do you offer free shipping?",
+      ]);
+      const [starterPromptsEnabled, setStarterPromptsEnabled] = useState(true);
+
+      const flows = [
+        "Tennis Racket Finder",
+        "Can I adjust my order?",
+        "How can I get 10% off my first order?",
+        "How long does shipping take?",
+        "Warranty",
+      ];
+
+      return (
+        <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+          <SettingsSidebar />
+          <SettingsContent
+            prompts={prompts}
+            setPrompts={setPrompts}
+            starterPromptsEnabled={starterPromptsEnabled}
+            setStarterPromptsEnabled={setStarterPromptsEnabled}
+          />
+          <ChatPreview
+            prompts={prompts}
+            starterPromptsEnabled={starterPromptsEnabled}
+            flows={flows}
+          />
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
