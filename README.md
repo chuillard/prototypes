@@ -4,24 +4,39 @@ Interactive UI prototypes for Gorgias product features.
 
 **Live index:** [chuillard.github.io/prototypes](https://chuillard.github.io/prototypes/)
 
-## Skill-linked Conversation Starters (NEW)
+## Wizard: Conversation Starters Step (NEW)
 
-**File:** `conversation-starters-skills.html`
+**File:** `conversation-starters-step.html`
 
-Evolution of conversation starters where prompts are linked to AI Agent Skills. When a shopper clicks a skill-linked starter, the AI Agent handles the conversation using that Skill's instructions, actions, and knowledge — replacing static Flow decision trees.
+Final step of the Skills onboarding wizard — merchants choose which accepted skills to surface as conversation starters on their chat homepage.
 
 ### What's in the prototype
 
-- Full Gorgias app shell (icon rail, nav panel, content area) on AI Agent → Deploy → Chat
-- **Three starter types:** skill-linked (purple star, auto-generated from Skill), flow (legacy, with migration nudge), and custom (hand-written)
-- Click performance stats with mini bars per starter
-- "Add starter" dropdown: write manually or enable from a Skill
-- Drag-to-reorder, flow editor modal, live chat widget preview
-- Wilson-branded chat widget with functional starter buttons
+- Matches the Skills setup wizard style (sidebar, stepped progress, draft banner)
+- Value nudge: 47% average Flow completion rate, per-flow completion stats
+- Each starter shows: prompt text, source skill, badge, and which Flow it replaces
+- Toggles ON by default — merchants opt out, not in
+- Live Wilson chat widget preview (truncated to starters area) with looping fade-in animation
+- Link to Deploy → Chat → Conversation Starters settings
 
 ### Context
 
 Part of the [1-Step Flows → AI Agent Guidances](https://app.notion.com/p/3411ae2178f5816b90e6c77d4d408498) proposal — nudging merchants to surface migrated Skills as conversation starters, progressively replacing Flows.
+
+---
+
+## Skill-linked Conversation Starters
+
+**File:** `conversation-starters-skills.html`
+
+Settings page showing skill-linked starters replacing AI-generated ones. Full Gorgias app shell on AI Agent → Deploy → Chat.
+
+### What's in the prototype
+
+- **Three starter types:** skill-linked (purple star, auto-generated from Skill), flow (legacy, with migration nudge), and custom (hand-written)
+- Click performance stats with mini bars per starter
+- "Add starter" dropdown: write manually or enable from a Skill
+- Drag-to-reorder, flow editor modal, live Wilson chat widget preview
 
 ---
 
