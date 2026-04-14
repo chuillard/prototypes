@@ -2,25 +2,42 @@
 
 Interactive UI prototypes for Gorgias product features.
 
-## Starter Prompts
+**Live index:** [chuillard.github.io/prototypes](https://chuillard.github.io/prototypes/)
 
-**Files:** `starter-prompts-prototype.html` / `starter-prompts-prototype.jsx`
+## Skill-linked Conversation Starters (NEW)
 
-Replaces the existing Quick Replies feature with AI-powered starter prompts that trigger the AI Agent when clicked by shoppers.
+**File:** `conversation-starters-skills.html`
 
-### How it works
-
-- **Merchants** configure up to 3 short prompts in Settings > Channels > Chat > Automation
-- **Shoppers** see these prompts on the chat homepage as clickable suggestions
-- Clicking a prompt sends it as a message and the **AI Agent responds automatically**
-
-### Running the prototype
-
-Open `starter-prompts-prototype.html` directly in any browser. No build step needed. The `.jsx` file is the React component source for use in artifact viewers or React projects.
+Evolution of conversation starters where prompts are linked to AI Agent Skills. When a shopper clicks a skill-linked starter, the AI Agent handles the conversation using that Skill's instructions, actions, and knowledge — replacing static Flow decision trees.
 
 ### What's in the prototype
 
-- Full settings page layout matching Gorgias UI (sidebar, breadcrumbs, tabs)
-- **Automation tab** with three cards: Flows, Starter Prompts (new), Order Management
-- **Live chat preview** panel with functional AI Agent response simulation
-- Real-time sync between settings edits and chat preview
+- Full Gorgias app shell (icon rail, nav panel, content area) on AI Agent → Deploy → Chat
+- **Three starter types:** skill-linked (purple star, auto-generated from Skill), flow (legacy, with migration nudge), and custom (hand-written)
+- Click performance stats with mini bars per starter
+- "Add starter" dropdown: write manually or enable from a Skill
+- Drag-to-reorder, flow editor modal, live chat widget preview
+- Wilson-branded chat widget with functional starter buttons
+
+### Context
+
+Part of the [1-Step Flows → AI Agent Guidances](https://app.notion.com/p/3411ae2178f5816b90e6c77d4d408498) proposal — nudging merchants to surface migrated Skills as conversation starters, progressively replacing Flows.
+
+---
+
+## Conversation Starters (Original)
+
+**Files:** `starter-prompts-prototype.html` / `starter-prompts-prototype.jsx`
+
+Initial concept with three starter types: existing flows (read-only), AI-generated prompts from top customer questions, and custom hand-written prompts.
+
+### What's in the prototype
+
+- Settings page layout matching Gorgias UI (Settings → Channels → Chat)
+- Three starter types: flow, AI-generated, custom
+- Drag-to-reorder, flow editor modal, live chat preview
+- AI regeneration from ticket data
+
+### Running the prototypes
+
+Open any `.html` file directly in a browser. No build step needed. The `.jsx` file is the React component source for use in artifact viewers.
