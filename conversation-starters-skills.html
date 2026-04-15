@@ -217,7 +217,8 @@ const navConfig = {
   ],
 };
 
-function NavPanel() {
+function NavPanel({ config, onItemClick }) {
+  const nav = config || navConfig;
   return (
     <div style={{
       width: 220, background: tokens.bgWhite,
@@ -226,11 +227,11 @@ function NavPanel() {
       overflowY: "auto",
     }}>
       <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${tokens.border}` }}>
-        <span style={{ fontSize: 17, fontWeight: 700, color: tokens.text, letterSpacing: "-0.02em" }}>{navConfig.title}</span>
+        <span style={{ fontSize: 17, fontWeight: 700, color: tokens.text, letterSpacing: "-0.02em" }}>{nav.title}</span>
       </div>
-      <ShopifyAccountRow storeName={navConfig.storeName} />
+      <ShopifyAccountRow storeName={nav.storeName} />
       <div style={{ padding: "8px 8px", display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
-        {navConfig.sections.map((section, i) => {
+        {nav.sections.map((section, i) => {
           if (section.topItem) {
             return <NavTopItem key={section.topItem} label={section.topItem} />;
           }
@@ -238,7 +239,7 @@ function NavPanel() {
             <div key={section.label || i}>
               <NavSection label={section.label} />
               {section.items?.map((item) => (
-                <NavSubItem key={item.label} {...item} />
+                <NavSubItem key={item.label} {...item} onClick={() => onItemClick?.(item.label)} />
               ))}
             </div>
           );
@@ -274,23 +275,174 @@ function Toggle({ enabled, onToggle }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// CONVERSATION STARTERS — Unified card (Skills + Flows + Custom)
+// AVAILABLE SKILLS (for the skill picker)
+// ════════════════════════════════════════════════════════════════
+const availableSkills = [
+  { name: "Promo codes or free shipping", suggestedStarter: "Do you have any promo codes?", enabled: true },
+  { name: "Order status, tracking or delivery timing", suggestedStarter: "Where is my order?", enabled: true },
+  { name: "Shipping address update", suggestedStarter: "I need to update my shipping address", enabled: true },
+  { name: "Product edits in an order", suggestedStarter: "I want to change products in my order", enabled: true },
+  { name: "Order cancellation", suggestedStarter: "I need to cancel my order", enabled: true },
+  { name: "Missing items from an order", suggestedStarter: "Items are missing from my order", enabled: true },
+  { name: "Damaged, defective or broken item", suggestedStarter: "I received a damaged item", enabled: true },
+  { name: "Return, exchange or refund status", suggestedStarter: "I want to return or exchange an item", enabled: true },
+  { name: "Subscription cancellation", suggestedStarter: "I need to cancel my subscription", enabled: true },
+  { name: "Subscription modification (pause, skip, resume)", suggestedStarter: "I want to update my subscription", enabled: true },
+];
+
+// ════════════════════════════════════════════════════════════════
+// FLOW REPLACEMENT SUGGESTIONS (maps flow names to actions)
+// ════════════════════════════════════════════════════════════════
+const flowReplacements = {
+  "Tennis Racket Finder": {
+    completionRate: 12,
+    suggestedLabel: "Shopping Assistant",
+    navTarget: "Shopping Assistant",
+  },
+  "I need to manage my subscription": {
+    completionRate: 48,
+    suggestedLabel: "Support Action",
+    navTarget: "Support Actions",
+  },
+};
+
+// ════════════════════════════════════════════════════════════════
+// SKILL PICKER MODAL
+// ════════════════════════════════════════════════════════════════
+function SkillPickerModal({ open, onClose, onSelect, existingSkillNames }) {
+  const [search, setSearch] = useState("");
+  if (!open) return null;
+
+  const filtered = availableSkills.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) &&
+    !existingSkillNames.includes(s.name)
+  );
+
+  return (
+    <>
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 200,
+      }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: 440, maxHeight: "70vh", background: tokens.bgWhite, borderRadius: 16,
+        boxShadow: "0 24px 48px rgba(0,0,0,0.2)", zIndex: 201,
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        fontFamily: "Inter, sans-serif",
+      }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: tokens.text }}>Add from Skill</h2>
+            <button onClick={onClose} style={{
+              width: 28, height: 28, borderRadius: 6, border: `1px solid ${tokens.border}`,
+              background: "#fff", cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", flexShrink: 0,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M3 3l10 10M13 3L3 13" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <p style={{ fontSize: 13, color: tokens.textSecondary, margin: "0 0 14px", lineHeight: 1.4 }}>
+            Select a Skill to create a conversation starter. The starter will trigger AI Agent with that Skill's context.
+          </p>
+          <div style={{ position: "relative", marginBottom: 12 }}>
+            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: tokens.textMuted }}>⌕</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search skills..."
+              autoFocus
+              style={{
+                width: "100%", boxSizing: "border-box",
+                paddingLeft: 30, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
+                border: `1px solid ${tokens.border}`, borderRadius: 8,
+                fontSize: 13, color: tokens.text, background: tokens.bgWhite,
+                outline: "none", fontFamily: "inherit",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Skill list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: "24px 12px", textAlign: "center", color: tokens.textMuted, fontSize: 13 }}>
+              {search ? "No matching skills found" : "All skills are already added as starters"}
+            </div>
+          )}
+          {filtered.map((skill) => (
+            <div key={skill.name}
+              onClick={() => { onSelect(skill); }}
+              style={{
+                padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 12,
+                marginBottom: 2,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = tokens.bgPage}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                background: tokens.purpleLight,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.9"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>{skill.name}</div>
+                <div style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>"{skill.suggestedStarter}"</div>
+              </div>
+              {!skill.enabled && (
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: tokens.grayLight, color: tokens.textMuted, fontWeight: 500, flexShrink: 0 }}>Disabled</span>
+              )}
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M6 4l4 4-4 4" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// FLOW MIGRATION NUDGE
+// ════════════════════════════════════════════════════════════════
+function FlowMigrationNudge({ flowName, onNavigate }) {
+  const replacement = flowReplacements[flowName];
+  if (!replacement) return null;
+
+  return (
+    <div style={{
+      margin: "0 12px 4px 38px", padding: "4px 0",
+      display: "flex", alignItems: "center", gap: 6,
+      fontSize: 11, color: tokens.textMuted, lineHeight: 1.3,
+    }}>
+      <span style={{ color: "#D97706", fontWeight: 600, flexShrink: 0 }}>{replacement.completionRate}% completion</span>
+      <span style={{ color: tokens.border }}>·</span>
+      <span>Set up <span onClick={() => onNavigate?.(replacement.navTarget)} style={{ color: tokens.purple, fontWeight: 500, cursor: "pointer", textDecoration: "underline", textDecorationColor: tokens.purpleMid, textUnderlineOffset: 2 }}>{replacement.suggestedLabel}</span> instead</span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// CONVERSATION STARTERS — Unified card (Skills + Flows only)
 // ════════════════════════════════════════════════════════════════
 
 const MAX_STARTERS = 8;
 
-function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }) {
-  // starters: [{ text, type: "flow"|"skill"|"custom", skillName, editing }]
-  const [showAddMenu, setShowAddMenu] = useState(false);
+function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, onNavigate }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
-  const [flowEditorIdx, setFlowEditorIdx] = useState(null); // index of flow being "edited"
-  const [skillPopoverIdx, setSkillPopoverIdx] = useState(null); // index of skill starter showing popover
+  const [flowEditorIdx, setFlowEditorIdx] = useState(null);
+  const [skillPopoverIdx, setSkillPopoverIdx] = useState(null);
+  const [showSkillPicker, setShowSkillPicker] = useState(false);
 
   const removeStarter = (i) => setStarters(starters.filter((_, idx) => idx !== i));
-  const addStarter = () => {
-    if (starters.length < MAX_STARTERS) setStarters([...starters, { text: "", type: "custom", editing: true, clicks: null }]);
-  };
 
   const toggleEditing = (i) => {
     const n = [...starters];
@@ -304,9 +456,7 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
     if (starter.type === "flow") {
       setFlowEditorIdx(i);
     } else if (starter.type === "skill") {
-      // Show popover instead of full modal
-      setSkillPopoverIdx(skillPopoverIdx === i ? null : i);
-    } else {
+      // Skills are now renamable — toggle editing for the display text
       toggleEditing(i);
     }
   };
@@ -330,6 +480,21 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
     setDragOverIdx(null);
   };
   const handleDragEnd = () => { setDragIdx(null); setDragOverIdx(null); };
+
+  // Add from skill picker
+  const handleAddFromSkill = (skill) => {
+    const newStarter = {
+      text: skill.suggestedStarter,
+      type: "skill",
+      skillName: skill.name,
+      editing: false,
+      clicks: null,
+    };
+    setStarters([...starters, newStarter]);
+    setShowSkillPicker(false);
+  };
+
+  const existingSkillNames = starters.filter(s => s.type === "skill").map(s => s.skillName);
 
   const DragDots = () => (
     <svg width="12" height="16" viewBox="0 0 12 16" fill="none" style={{ cursor: "grab", flexShrink: 0 }}>
@@ -369,10 +534,10 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
   };
 
   // Type badge with tooltip for each row
-  const TypeBadge = ({ type, skillName, clicks }) => {
+  const TypeBadge = ({ type, skillName }) => {
     if (type === "skill") {
       return (
-        <Tooltip text={`Connected to the ${skillName} Skill. This starter is auto-generated from your Skill — edit it from the Skill settings page.`} width={240}>
+        <Tooltip text={`Triggers the "${skillName}" Skill. You can rename the display text — the Skill connection is preserved.`} width={240}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, cursor: "default", color: tokens.purple }}>
             <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="currentColor" opacity="0.9"/>
           </svg>
@@ -380,20 +545,12 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
       );
     }
     if (type === "flow") return (
-      <Tooltip text="Linked to a Flow — a guided, step-by-step self-service experience for shoppers. Consider migrating to a Skill for better AI Agent results." width={240}>
+      <Tooltip text="Linked to a legacy Flow. Flows can no longer be created — consider replacing with a Skill-linked starter for better AI Agent results." width={260}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, cursor: "default" }}>
-          <path d="M3 6h3a2 2 0 012 2v8a2 2 0 002 2h3" stroke={tokens.textSecondary} strokeWidth="1.7" strokeLinecap="round"/>
-          <path d="M21 18h-3a2 2 0 01-2-2V8a2 2 0 00-2-2H11" stroke={tokens.textSecondary} strokeWidth="1.7" strokeLinecap="round"/>
-          <circle cx="3" cy="6" r="2" stroke={tokens.textSecondary} strokeWidth="1.7"/>
-          <circle cx="21" cy="18" r="2" stroke={tokens.textSecondary} strokeWidth="1.7"/>
-        </svg>
-      </Tooltip>
-    );
-    if (type === "custom") return (
-      <Tooltip text="Hand-written prompt. Make sure a Guidance covers this topic so AI Agent can answer." width={230}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, cursor: "default" }}>
-          <circle cx="12" cy="8" r="4" stroke={tokens.yellow} strokeWidth="1.7"/>
-          <path d="M4 21v-1a8 8 0 0116 0v1" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+          <path d="M3 6h3a2 2 0 012 2v8a2 2 0 002 2h3" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+          <path d="M21 18h-3a2 2 0 01-2-2V8a2 2 0 00-2-2H11" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+          <circle cx="3" cy="6" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
+          <circle cx="21" cy="18" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
         </svg>
       </Tooltip>
     );
@@ -429,185 +586,190 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
         </div>
         <Toggle enabled={enabled} onToggle={() => setEnabled(!enabled)} />
       </div>
-      <p style={{ fontSize: 14, color: tokens.textSecondary, margin: "0 0 20px", lineHeight: 1.5 }}>
+      <p style={{ fontSize: 14, color: tokens.textSecondary, margin: "0 0 16px", lineHeight: 1.5 }}>
         Help shoppers get answers faster. Skill-linked starters trigger the AI Agent automatically.
       </p>
+
+      {/* ── Flows deprecation callout ── */}
+      {enabled && starters.some(s => s.type === "flow") && (
+        <div style={{
+          padding: "12px 16px", background: "#FFF7ED", borderRadius: 10,
+          border: "1px solid #FDBA74", marginBottom: 16,
+          display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ marginTop: 1, flexShrink: 0 }}>
+            <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="#EA580C" opacity="0.8"/>
+          </svg>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#9A3412", marginBottom: 3 }}>
+              Resolve more with AI Agent
+            </div>
+            <div style={{ fontSize: 12, color: "#9A3412", lineHeight: 1.5 }}>
+              AI Agent handles conversations end-to-end with higher resolution rates than static Flows. We'll progressively help you transition your existing Flows to Skill-linked starters that trigger AI Agent — look for recommendations below. New Flows can no longer be created, but you can still edit existing ones.
+            </div>
+          </div>
+        </div>
+      )}
+
       {enabled && (
         <>
           {starters.map((starter, i) => {
             const isEditing = starter.editing;
-            const isCustom = starter.type === "custom" && starter.text.trim() !== "";
             const isDragTarget = dragOverIdx === i && dragIdx !== i;
             return (
-              <div key={i}
-                draggable={!isEditing}
-                onDragStart={() => handleDragStart(i)}
-                onDragOver={(e) => handleDragOver(e, i)}
-                onDrop={() => handleDrop(i)}
-                onDragEnd={handleDragEnd}
-                style={{ opacity: dragIdx === i ? 0.4 : 1, transition: "opacity 0.15s" }}>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                  borderBottom: i < starters.length - 1 ? `1px solid ${tokens.grayLight}` : "none",
-                  borderTop: isDragTarget ? `2px solid ${tokens.accent}` : "2px solid transparent",
-                  position: "relative",
-                }}>
-                  <DragDots />
-                  {/* Type indicator */}
-                  <TypeBadge type={starter.type} skillName={starter.skillName} clicks={starter.clicks} />
-                  {/* Text */}
-                  {isEditing ? (
-                    <input type="text" value={starter.text}
-                      onChange={(e) => updateText(i, e.target.value)}
-                      placeholder="e.g. Where is my order?"
-                      maxLength={80}
-                      autoFocus
-                      style={{
-                        flex: 1, padding: "8px 12px", border: `1px solid ${tokens.accent}`,
-                        borderRadius: 8, fontSize: 14, color: tokens.text,
-                        background: tokens.bgWhite, outline: "none", fontFamily: "inherit",
-                      }}
-                      onBlur={() => { if (starter.text.trim()) toggleEditing(i); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" && starter.text.trim()) toggleEditing(i); }}
-                    />
-                  ) : (
-                    <span style={{ flex: 1, fontSize: 14, color: starter.text ? tokens.text : tokens.textMuted, lineHeight: 1.4 }}>
-                      {starter.text || "Empty starter"}
-                    </span>
-                  )}
-                  {/* Click stats */}
-                  {starter.clicks != null && !isEditing && (
-                    <Tooltip text={`${starter.clicks} clicks in the last 30 days`} width={160}>
-                      <ClickStat clicks={starter.clicks} isTop={starter.clicks === maxClicks} />
-                    </Tooltip>
-                  )}
-                  {/* Edit button — behavior depends on type */}
-                  {!isEditing && (
-                    <button onClick={() => handleEdit(i)}
-                      title={starter.type === "flow" ? "Open flow editor" : starter.type === "skill" ? "Go to Skill" : "Edit"}
-                      style={{
-                        width: 30, height: 30, borderRadius: 6, border: "none",
-                        background: "transparent", cursor: "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                        position: "relative",
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      {starter.type === "flow" ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round"/>
-                          <path d="M15 3h6v6M10 14L21 3" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      ) : starter.type === "skill" ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round"/>
-                          <path d="M15 3h6v6M10 14L21 3" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      ) : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round"/>
-                          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
-                      {/* Skill popover */}
-                      {starter.type === "skill" && skillPopoverIdx === i && (
-                        <div style={{
-                          position: "absolute", bottom: "calc(100% + 8px)", right: 0,
-                          background: tokens.bgWhite, borderRadius: 8, border: `1px solid ${tokens.border}`,
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 1000, minWidth: 240, padding: "12px 14px",
-                        }} onClick={(e) => e.stopPropagation()}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: tokens.text, marginBottom: 6 }}>{starter.skillName}</div>
-                          <div style={{ fontSize: 12, color: tokens.textSecondary, marginBottom: 10, lineHeight: 1.4 }}>
-                            This conversation starter is managed from the Skill page.
+              <div key={i}>
+                <div
+                  draggable={!isEditing}
+                  onDragStart={() => handleDragStart(i)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDrop={() => handleDrop(i)}
+                  onDragEnd={handleDragEnd}
+                  style={{ opacity: dragIdx === i ? 0.4 : 1, transition: "opacity 0.15s" }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                    borderBottom: i < starters.length - 1 ? `1px solid ${tokens.grayLight}` : "none",
+                    borderTop: isDragTarget ? `2px solid ${tokens.accent}` : "2px solid transparent",
+                    position: "relative",
+                  }}>
+                    <DragDots />
+                    {/* Type indicator */}
+                    <TypeBadge type={starter.type} skillName={starter.skillName} />
+                    {/* Text — editable for skills (renamable) */}
+                    {isEditing ? (
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <input type="text" value={starter.text}
+                          onChange={(e) => updateText(i, e.target.value)}
+                          placeholder={starter.type === "skill" ? "Rename this starter..." : "e.g. Where is my order?"}
+                          maxLength={80}
+                          autoFocus
+                          style={{
+                            flex: 1, padding: "8px 12px", border: `1px solid ${tokens.accent}`,
+                            borderRadius: 8, fontSize: 14, color: tokens.text,
+                            background: tokens.bgWhite, outline: "none", fontFamily: "inherit",
+                          }}
+                          onBlur={() => { if (starter.text.trim()) toggleEditing(i); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" && starter.text.trim()) toggleEditing(i); }}
+                        />
+                        {starter.type === "skill" && (
+                          <div style={{ fontSize: 11, color: tokens.textMuted, paddingLeft: 2 }}>
+                            Linked to: <span style={{ color: tokens.purple, fontWeight: 500 }}>{starter.skillName}</span>
                           </div>
-                          <button style={{
-                            width: "100%", padding: "6px 10px", borderRadius: 6, border: "none",
-                            background: tokens.purple, color: "#fff", fontSize: 12, fontWeight: 600,
-                            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                          }}>
-                            Go to Skill
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                              <path d="M7 17L17 7M17 7H10M17 7V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ flex: 1, fontSize: 14, color: starter.text ? tokens.text : tokens.textMuted, lineHeight: 1.4 }}>
+                        {starter.text || "Empty starter"}
+                      </span>
+                    )}
+                    {/* Click stats */}
+                    {starter.clicks != null && !isEditing && (
+                      <Tooltip text={`${starter.clicks} clicks in the last 30 days`} width={160}>
+                        <ClickStat clicks={starter.clicks} isTop={starter.clicks === maxClicks} />
+                      </Tooltip>
+                    )}
+                    {/* Action buttons */}
+                    {!isEditing && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                        {/* Rename (pencil) — for skills */}
+                        {starter.type === "skill" && (
+                          <button onClick={() => handleEdit(i)}
+                            title="Rename"
+                            style={{
+                              width: 30, height: 30, borderRadius: 6, border: "none",
+                              background: "transparent", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           </button>
-                        </div>
-                      )}
-                    </button>
-                  )}
-                  {/* Remove */}
-                  <button onClick={() => removeStarter(i)} style={{
-                    width: 30, height: 30, borderRadius: 6, border: "none",
-                    background: "transparent", cursor: "pointer", color: tokens.textMuted,
-                    fontSize: 18, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>&times;</button>
+                        )}
+                        {/* Go to Skill page — for skills */}
+                        {starter.type === "skill" && (
+                          <button
+                            title="Go to Skill"
+                            style={{
+                              width: 30, height: 30, borderRadius: 6, border: "none",
+                              background: "transparent", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M15 3h6v6M10 14L21 3" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        )}
+                        {/* Open flow editor — for flows */}
+                        {starter.type === "flow" && (
+                          <button onClick={() => handleEdit(i)}
+                            title="Edit flow"
+                            style={{
+                              width: 30, height: 30, borderRadius: 6, border: "none",
+                              background: "transparent", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M15 3h6v6M10 14L21 3" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {/* Remove */}
+                    <button onClick={() => removeStarter(i)} style={{
+                      width: 30, height: 30, borderRadius: 6, border: "none",
+                      background: "transparent", cursor: "pointer", color: tokens.textMuted,
+                      fontSize: 18, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>&times;</button>
+                  </div>
                 </div>
+                {/* Flow migration nudge — shown below each flow row */}
+                {starter.type === "flow" && (
+                  <FlowMigrationNudge flowName={starter.text} onNavigate={onNavigate} />
+                )}
               </div>
             );
           })}
 
-          {/* Bottom action — single "Add starter" dropdown */}
+          {/* Bottom action — only "Add from Skill" */}
           {starters.length < MAX_STARTERS && (
-            <div style={{ marginTop: 14, position: "relative" }}>
-              <button onClick={() => setShowAddMenu(prev => !prev)}
+            <div style={{ marginTop: 14 }}>
+              <button onClick={() => setShowSkillPicker(true)}
                 style={{
-                  padding: "8px 16px", borderRadius: 8, border: `1px solid ${tokens.border}`,
-                  background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.text,
+                  padding: "8px 16px", borderRadius: 8, border: `1px solid ${tokens.accent}`,
+                  background: tokens.purpleLight, fontSize: 13, fontWeight: 600, color: tokens.purple,
                   cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
                 }}>
-                <>
-                  <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add starter
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ marginLeft: 2 }}>
-                    <path d="M4 6l4 4 4-4" stroke={tokens.textSecondary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.9"/>
+                </svg>
+                Add from Skill
               </button>
-              {showAddMenu && (
-                <>
-                  <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
-                    onClick={() => setShowAddMenu(false)} />
-                  <div style={{
-                    position: "absolute", top: "calc(100% + 4px)", left: 0,
-                    background: tokens.bgWhite, borderRadius: 10, border: `1px solid ${tokens.border}`,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 1000, width: 280, overflow: "hidden",
-                  }}>
-                    <div onClick={() => { addStarter(); setShowAddMenu(false); }}
-                      style={{ padding: "12px 14px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 10 }}
-                      onMouseEnter={e => e.currentTarget.style.background = tokens.bgPage}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ marginTop: 2, flexShrink: 0 }}>
-                        <circle cx="12" cy="8" r="4" stroke={tokens.textSecondary} strokeWidth="1.7"/>
-                        <path d="M4 21v-1a8 8 0 0116 0v1" stroke={tokens.textSecondary} strokeWidth="1.7" strokeLinecap="round"/>
-                      </svg>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>Write manually</div>
-                        <div style={{ fontSize: 12, color: tokens.textSecondary, marginTop: 2, lineHeight: 1.35 }}>Type a custom question for shoppers</div>
-                      </div>
-                    </div>
-                    <div style={{ height: 1, background: tokens.border }} />
-                    <div onClick={() => { setShowAddMenu(false); }}
-                      style={{ padding: "12px 14px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 10 }}
-                      onMouseEnter={e => e.currentTarget.style.background = tokens.bgPage}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ marginTop: 2, flexShrink: 0, color: tokens.purple }} fill="currentColor" opacity="0.9">
-                        <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="currentColor" opacity="0.9"/>
-                      </svg>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>Enable from a Skill</div>
-                        <div style={{ fontSize: 12, color: tokens.textSecondary, marginTop: 2, lineHeight: 1.35 }}>Link a conversation starter to one of your enabled Skills</div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
           )}
           <div style={{ marginTop: 8, fontSize: 12, color: tokens.textMuted }}>{starters.length} / {MAX_STARTERS} starters</div>
         </>
       )}
 
-      {/* Flow Editor Modal — workflow builder in modal */}
+      {/* Skill Picker Modal */}
+      <SkillPickerModal
+        open={showSkillPicker}
+        onClose={() => setShowSkillPicker(false)}
+        onSelect={handleAddFromSkill}
+        existingSkillNames={existingSkillNames}
+      />
+
+      {/* Flow Editor Modal */}
       {flowEditorIdx !== null && (() => {
         const flowName = starters[flowEditorIdx]?.text || "Untitled Flow";
         return (
@@ -635,6 +797,14 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
                   </button>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Read-only notice */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, background: "#FEF3C7", border: "1px solid #FDE68A", fontSize: 11, fontWeight: 600, color: "#92400E" }}>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="8" r="6" stroke="#D97706" strokeWidth="1.3"/>
+                      <path d="M8 5v3M8 10v.5" stroke="#D97706" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                    Edit only — try AI Agent for better results
+                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: `1px solid ${tokens.border}`, fontSize: 13, fontWeight: 500, color: tokens.text, cursor: "pointer", background: tokens.bgWhite }}>
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2l6.93 4v8L8 18 1.07 14V6L8 2z" stroke={tokens.text} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" fill={tokens.text}/></svg>
                     English - US
@@ -706,7 +876,7 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
                   <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text }}>{flowName}</div>
                 </div>
 
-                {/* Connector line + add button */}
+                {/* Connector */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <div style={{ width: 1, height: 24, background: tokens.border }} />
                   <div style={{ width: 20, height: 20, borderRadius: 10, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: tokens.textMuted, cursor: "pointer" }}>+</div>
@@ -728,7 +898,7 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled }
                   <div style={{ fontSize: 13, color: tokens.text, lineHeight: 1.45 }}>Hi! Our Customer Care Team is offline for the Thanksgiving holiday...</div>
                 </div>
 
-                {/* Connector line + add button */}
+                {/* Connector */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <div style={{ width: 1, height: 24, background: tokens.border }} />
                   <div style={{ width: 20, height: 20, borderRadius: 10, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: tokens.textMuted, cursor: "pointer" }}>+</div>
@@ -781,7 +951,7 @@ function OrderManagementCard() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// CHAT PREVIEW — matches real Gorgias widget
+// CHAT PREVIEW — FIXED SIZE, scrollable
 // ════════════════════════════════════════════════════════════════
 function ChatPreview({ starters, enabled }) {
   const [messages, setMessages] = useState([]);
@@ -804,8 +974,15 @@ function ChatPreview({ starters, enabled }) {
   const showHome = messages.length === 0;
 
   return (
-    <div style={{ width: 420, flexShrink: 0, background: tokens.bgPage, display: "flex", flexDirection: "column", height: "100%", borderLeft: `1px solid ${tokens.border}` }}>
-      <div style={{ padding: "10px 16px", borderBottom: `1px solid ${tokens.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: tokens.bgWhite }}>
+    <div style={{
+      width: 380, flexShrink: 0,
+      background: tokens.bgPage,
+      display: "flex", flexDirection: "column",
+      borderLeft: `1px solid ${tokens.border}`,
+      height: "100%",
+      overflow: "hidden",
+    }}>
+      <div style={{ padding: "10px 16px", borderBottom: `1px solid ${tokens.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: tokens.bgWhite, flexShrink: 0 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textSecondary }}>Chat preview</span>
         <div style={{ display: "flex", gap: 6 }}>
           {[<svg key="h" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M3 10.5L12 3l9 7.5V21H15v-5h-6v5H3V10.5z" stroke={tokens.textSecondary} strokeWidth="1.7" strokeLinejoin="round"/></svg>,
@@ -816,92 +993,277 @@ function ChatPreview({ starters, enabled }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, margin: 12, borderRadius: 16, boxShadow: "0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", overflow: "hidden", background: tokens.bgWhite, border: `1px solid ${tokens.border}` }}>
-        {showHome ? (
-          <>
-            <div style={{ background: brandBgGradient, position: "relative", display: "flex", flexDirection: "column", flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px 0" }}>
-                <div style={{ width: 28 }} />
+      {/* Fixed-size chat widget container — centered with fixed dimensions */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        overflow: "auto",
+      }}>
+        <div style={{
+          width: 340,
+          height: 520,
+          minHeight: 520,
+          maxHeight: 520,
+          borderRadius: 16,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          background: tokens.bgWhite,
+          border: `1px solid ${tokens.border}`,
+          flexShrink: 0,
+        }}>
+          {showHome ? (
+            <>
+              <div style={{ background: brandBgGradient, position: "relative", display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px 0", flexShrink: 0 }}>
+                  <div style={{ width: 28 }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 16, background: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500, color: "#fff", cursor: "pointer" }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><circle cx="20" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                      Track orders
+                    </div>
+                    <div style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: "#fff" }}>&times;</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 20px 10px", flexShrink: 0 }}>
+                  <div style={{ fontSize: 38, fontWeight: 900, color: "#fff", fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", letterSpacing: "-0.03em", lineHeight: 1 }}>Wilson</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 6, textAlign: "center", lineHeight: 1.4 }}>This chat is AI-powered for faster assistance.</div>
+                </div>
+                <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", flex: 1 }}>
+                  {activeStarters.map((starter, i) => (
+                    <button key={i} onClick={() => simulateAiResponse(starter.text)} style={{
+                      padding: "9px 14px", borderRadius: 20, border: "none",
+                      background: "rgba(255,255,255,0.20)", fontSize: 12, fontWeight: 500,
+                      color: "#fff", cursor: "pointer", textAlign: "left",
+                      display: "inline-flex", alignItems: "center", gap: 5, width: "auto", alignSelf: "flex-start",
+                      flexShrink: 0,
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.35)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.20)"; }}>
+                      {starter.text}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ padding: "10px 14px 14px", flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderRadius: 22, background: "rgba(255,255,255,0.20)" }}>
+                    <span style={{ fontSize: 14, color: "rgba(255,255,255,0.6)" }}>Ask anything</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ background: brandBgGradient, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div onClick={handleReset} style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic" }}>Wilson</div>
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 16, background: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500, color: "#fff", cursor: "pointer" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><circle cx="20" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 16, background: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500, color: "#fff" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><circle cx="20" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>
                     Track orders
                   </div>
                   <div style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: "#fff" }}>&times;</div>
                 </div>
               </div>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 20px 10px" }}>
-                <div style={{ fontSize: 38, fontWeight: 900, color: "#fff", fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", letterSpacing: "-0.03em", lineHeight: 1 }}>Wilson</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 6, textAlign: "center", lineHeight: 1.4 }}>This chat is AI-powered for faster assistance.</div>
-              </div>
-              <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
-                {activeStarters.map((starter, i) => (
-                  <button key={i} onClick={() => simulateAiResponse(starter.text)} style={{
-                    padding: "9px 14px", borderRadius: 20, border: "none",
-                    background: "rgba(255,255,255,0.20)", fontSize: 12, fontWeight: 500,
-                    color: "#fff", cursor: "pointer", textAlign: "left",
-                    display: "inline-flex", alignItems: "center", gap: 5, width: "auto", alignSelf: "flex-start",
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.35)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.20)"; }}>
-                    {starter.text}
-                  </button>
+              <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px", background: tokens.bgWhite }}>
+                {messages.map((msg, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 10, animation: "fadeIn 0.25s ease-out" }}>
+                    {msg.role === "ai" && <div style={{ width: 26, height: 26, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg, ${brandColor}, #E06070)`, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, marginTop: 2 }}><span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>AI</span></div>}
+                    <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#F3F4F6" : "#F9FAFB", border: msg.role === "user" ? "none" : `1px solid ${tokens.grayLight}`, color: tokens.text, fontSize: 13, lineHeight: 1.55 }}>{msg.text}</div>
+                  </div>
                 ))}
+                {isTyping && (
+                  <div style={{ display: "flex", alignItems: "flex-start", animation: "fadeIn 0.3s ease-out" }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg, ${brandColor}, #E06070)`, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, marginTop: 2 }}><span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>AI</span></div>
+                    <div style={{ padding: "10px 14px", borderRadius: "16px 16px 16px 4px", background: "#F9FAFB", border: `1px solid ${tokens.grayLight}`, display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 16, height: 16, border: `2px solid ${tokens.border}`, borderTopColor: brandColor, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                      <span style={{ fontSize: 13, color: tokens.textSecondary }}>Gathering details</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-              <div style={{ padding: "10px 14px 14px" }}>
-                <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderRadius: 22, background: "rgba(255,255,255,0.20)" }}>
-                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.6)" }}>Ask anything</span>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ background: brandBgGradient, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div onClick={handleReset} style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic" }}>Wilson</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 16, background: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500, color: "#fff" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><circle cx="20" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                  Track orders
-                </div>
-                <div style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: "#fff" }}>&times;</div>
-              </div>
-            </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px", background: tokens.bgWhite }}>
-              {messages.map((msg, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 10, animation: "fadeIn 0.25s ease-out" }}>
-                  {msg.role === "ai" && <div style={{ width: 26, height: 26, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg, ${brandColor}, #E06070)`, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, marginTop: 2 }}><span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>AI</span></div>}
-                  <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#F3F4F6" : "#F9FAFB", border: msg.role === "user" ? "none" : `1px solid ${tokens.grayLight}`, color: tokens.text, fontSize: 13, lineHeight: 1.55 }}>{msg.text}</div>
-                </div>
-              ))}
-              {isTyping && (
-                <div style={{ display: "flex", alignItems: "flex-start", animation: "fadeIn 0.3s ease-out" }}>
-                  <div style={{ width: 26, height: 26, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg, ${brandColor}, #E06070)`, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, marginTop: 2 }}><span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>AI</span></div>
-                  <div style={{ padding: "10px 14px", borderRadius: "16px 16px 16px 4px", background: "#F9FAFB", border: `1px solid ${tokens.grayLight}`, display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 16, height: 16, border: `2px solid ${tokens.border}`, borderTopColor: brandColor, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                    <span style={{ fontSize: 13, color: tokens.textSecondary }}>Gathering details</span>
+              <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${tokens.grayLight}`, background: tokens.bgWhite, flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 22, border: `1.5px solid ${tokens.border}` }}>
+                  <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && inputValue.trim() && !isTyping) { simulateAiResponse(inputValue.trim()); setInputValue(""); } }} placeholder="Reply" style={{ flex: 1, padding: "2px 0", border: "none", fontSize: 14, color: tokens.text, outline: "none", background: "transparent", fontFamily: "inherit" }} />
+                  <div onClick={() => { if (inputValue.trim() && !isTyping) { simulateAiResponse(inputValue.trim()); setInputValue(""); } }} style={{ width: 28, height: 28, borderRadius: 14, background: inputValue.trim() ? brandColor : tokens.grayLight, display: "flex", alignItems: "center", justifyContent: "center", cursor: inputValue.trim() ? "pointer" : "default", flexShrink: 0 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke={inputValue.trim() ? "#fff" : tokens.textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
                 </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-            <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${tokens.grayLight}`, background: tokens.bgWhite }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 22, border: `1.5px solid ${tokens.border}` }}>
-                <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && inputValue.trim() && !isTyping) { simulateAiResponse(inputValue.trim()); setInputValue(""); } }} placeholder="Reply" style={{ flex: 1, padding: "2px 0", border: "none", fontSize: 14, color: tokens.text, outline: "none", background: "transparent", fontFamily: "inherit" }} />
-                <div onClick={() => { if (inputValue.trim() && !isTyping) { simulateAiResponse(inputValue.trim()); setInputValue(""); } }} style={{ width: 28, height: 28, borderRadius: 14, background: inputValue.trim() ? brandColor : tokens.grayLight, display: "flex", alignItems: "center", justifyContent: "center", cursor: inputValue.trim() ? "pointer" : "default", flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke={inputValue.trim() ? "#fff" : tokens.textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
-      <div style={{ textAlign: "center", padding: "6px 0 10px", fontSize: 10, color: tokens.textMuted }}>Powered by <span style={{ fontWeight: 600 }}>Gorgias</span></div>
+      <div style={{ textAlign: "center", padding: "6px 0 10px", fontSize: 10, color: tokens.textMuted, flexShrink: 0 }}>Powered by <span style={{ fontWeight: 600 }}>Gorgias</span></div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// SUPPORT ACTIONS PAGE (static, matches real Gorgias screenshot)
+// ════════════════════════════════════════════════════════════════
+const supportActionTemplates = [
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Cancel order" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Get order info" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Refund shipping costs" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Remove item" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Replace item" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Reship order for free" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Update shipping address" },
+  { category: "Returns & Exchanges", color: "#DC2626", bgColor: "#FEE2E2", name: "Send return portal link" },
+  { category: "Returns & Exchanges", color: "#DC2626", bgColor: "#FEE2E2", name: "Send return shipping status" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Cancel subscription" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Pause subscription" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Resume subscription" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Skip next subscription shipment" },
+  { category: "Marketing", color: "#7C3AED", bgColor: "#EDE9FE", name: "Unsubscribe from mailing list" },
+];
+
+function SupportActionsPage({ onBack }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${tokens.border}` }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: tokens.text }}>Support Actions</span>
+        <button style={{
+          padding: "7px 14px", borderRadius: 8, border: `1px solid ${tokens.border}`,
+          background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.text, cursor: "pointer",
+        }}>Test</button>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        {/* Back link */}
+        <div onClick={onBack} style={{
+          display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: tokens.textSecondary,
+          cursor: "pointer", marginBottom: 20,
+        }}
+          onMouseEnter={e => e.currentTarget.style.color = tokens.text}
+          onMouseLeave={e => e.currentTarget.style.color = tokens.textSecondary}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          Back to Support Actions
+        </div>
+
+        {/* Title + action */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: tokens.text }}>Choose a template and customize it to fit your needs</span>
+          <button style={{
+            padding: "8px 16px", borderRadius: 8, border: `1px solid ${tokens.border}`,
+            background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.text, cursor: "pointer",
+          }}>Create Custom Action</button>
+        </div>
+
+        {/* Card grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          {supportActionTemplates.map((tpl, i) => (
+            <div key={i} style={{
+              padding: "20px 20px 40px", borderRadius: 12, border: `1px solid ${tokens.border}`,
+              background: tokens.bgWhite, cursor: "pointer",
+              transition: "box-shadow 0.15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 4,
+                background: tpl.bgColor, color: tpl.color, display: "inline-block", marginBottom: 12,
+              }}>{tpl.category}</span>
+              <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>{tpl.name}</div>
+            </div>
+          ))}
+          {/* Create custom action card */}
+          <div style={{
+            padding: "20px 20px 40px", borderRadius: 12, border: `1px dashed ${tokens.border}`,
+            background: tokens.bgWhite, cursor: "pointer",
+            display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center",
+          }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = tokens.textMuted}
+            onMouseLeave={e => e.currentTarget.style.borderColor = tokens.border}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 14, background: tokens.grayLight,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 12, fontSize: 18, color: tokens.textMuted,
+            }}>+</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>Create custom Action</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// SHOPPING ASSISTANT PAGE (static placeholder)
+// ════════════════════════════════════════════════════════════════
+function ShoppingAssistantPage({ onBack }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${tokens.border}` }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: tokens.text }}>Shopping Assistant</span>
+        <Toggle enabled={true} />
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        {/* Back link */}
+        <div onClick={onBack} style={{
+          display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: tokens.textSecondary,
+          cursor: "pointer", marginBottom: 24,
+        }}
+          onMouseEnter={e => e.currentTarget.style.color = tokens.text}
+          onMouseLeave={e => e.currentTarget.style.color = tokens.textSecondary}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          Back to Chat Settings
+        </div>
+
+        {/* Info banner */}
+        <div style={{
+          padding: "16px 20px", background: tokens.purpleLight, borderRadius: 12,
+          border: "1px solid #DDD6FE", marginBottom: 24,
+          display: "flex", alignItems: "flex-start", gap: 12,
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+            <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.8"/>
+          </svg>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#5B21B6", marginBottom: 4 }}>Shopping Assistant helps shoppers find the right product</div>
+            <div style={{ fontSize: 13, color: "#6D28D9", lineHeight: 1.5 }}>
+              It uses your product catalog, brand guidelines, and customer preferences to recommend products through natural conversation. Configure it here to replace product-finder Flows with a smarter, AI-powered experience.
+            </div>
+          </div>
+        </div>
+
+        {/* Settings cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 680 }}>
+          {[
+            { title: "Product catalog", desc: "Connected to your Shopify catalog. 1,247 products synced.", status: "Connected" },
+            { title: "Brand voice", desc: "Define how the assistant talks about your products — tone, vocabulary, key selling points.", status: "Configured" },
+            { title: "Recommendation rules", desc: "Set logic for how products are suggested — by bestsellers, margin, availability, or custom rules.", status: "3 rules active" },
+          ].map((card, i) => (
+            <div key={i} style={{
+              padding: 20, borderRadius: 12, border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+              display: "flex", alignItems: "center", gap: 16,
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>{card.title}</div>
+                <div style={{ fontSize: 13, color: tokens.textSecondary, lineHeight: 1.4 }}>{card.desc}</div>
+              </div>
+              <span style={{
+                fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: 6,
+                background: tokens.greenLight, color: tokens.green, flexShrink: 0,
+              }}>{card.status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -909,7 +1271,7 @@ function ChatPreview({ starters, enabled }) {
 // ════════════════════════════════════════════════════════════════
 // SETTINGS PAGE CONTENT (Chat settings under Deploy > Chat)
 // ════════════════════════════════════════════════════════════════
-function SettingsContent({ starters, setStarters, startersEnabled, setStartersEnabled }) {
+function SettingsContent({ starters, setStarters, startersEnabled, setStartersEnabled, onNavigate }) {
   const [activeTab, setActiveTab] = useState("automation");
   const tabs = [
     { id: "appearance", label: "Appearance" },
@@ -955,7 +1317,7 @@ function SettingsContent({ starters, setStarters, startersEnabled, setStartersEn
       <div style={{ flex: 1, overflowY: "auto" }}>
         {activeTab === "automation" ? (
           <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20, maxWidth: 680 }}>
-            <ConversationStartersCard starters={starters} setStarters={setStarters} enabled={startersEnabled} setEnabled={setStartersEnabled} />
+            <ConversationStartersCard starters={starters} setStarters={setStarters} enabled={startersEnabled} setEnabled={setStartersEnabled} onNavigate={onNavigate} />
             <OrderManagementCard />
           </div>
         ) : (
@@ -969,19 +1331,94 @@ function SettingsContent({ starters, setStarters, startersEnabled, setStartersEn
 }
 
 // ════════════════════════════════════════════════════════════════
-// MAIN APP
+// MAIN APP — with page-level navigation
 // ════════════════════════════════════════════════════════════════
 function ConversationStartersSkillsPrototype() {
   const [starters, setStarters] = useState([
-    { text: "Where is my order?", type: "skill", skillName: "Order status, tracking & delivery", editing: false, clicks: 2847 },
-    { text: "I want to return or exchange an item", type: "skill", skillName: "Returns and exchanges", editing: false, clicks: 1523 },
-    { text: "I need to cancel my order", type: "skill", skillName: "Order cancellations", editing: false, clicks: 891 },
-    { text: "I received a damaged item", type: "skill", skillName: "Damaged or defective items", editing: false, clicks: 412 },
+    { text: "Where is my order?", type: "skill", skillName: "Order status, tracking or delivery timing", editing: false, clicks: 2847 },
+    { text: "I want to return or exchange an item", type: "skill", skillName: "Return, exchange or refund status", editing: false, clicks: 1523 },
+    { text: "I need to cancel my order", type: "skill", skillName: "Order cancellation", editing: false, clicks: 891 },
+    { text: "I received a damaged item", type: "skill", skillName: "Damaged, defective or broken item", editing: false, clicks: 412 },
     { text: "Tennis Racket Finder", type: "flow", editing: false, clicks: 482 },
-    { text: "How long does shipping take?", type: "flow", editing: false, clicks: 89 },
-    { text: "Do you have any discounts?", type: "custom", editing: false, clicks: 289 },
+    { text: "I need to manage my subscription", type: "flow", editing: false, clicks: 203 },
   ]);
   const [startersEnabled, setStartersEnabled] = useState(true);
+  // Page navigation: "chat-settings" | "support-actions" | "shopping-assistant"
+  const [activePage, setActivePage] = useState("chat-settings");
+
+  // Build nav config dynamically based on active page
+  const getNavConfig = () => {
+    const base = {
+      title: "AI Agent",
+      storeName: "one-bone",
+      sections: [
+        {
+          label: "Analyze",
+          items: [
+            { label: "Overview" },
+            { label: "Intents" },
+            { label: "Opportunities", badge: "Beta", count: 30 },
+          ],
+        },
+        {
+          label: "Train",
+          items: [
+            { label: "Knowledge" },
+            { label: "Support Actions", isActive: activePage === "support-actions" },
+            { label: "Products" },
+            { label: "Shopping Assistant", isActive: activePage === "shopping-assistant" },
+          ],
+        },
+        { topItem: "Test" },
+        {
+          label: "Deploy",
+          items: [
+            { label: "Chat", isActive: activePage === "chat-settings", dot: true },
+            { label: "Email", dot: true },
+            { label: "SMS", dot: true },
+          ],
+        },
+        { topItem: "Settings" },
+      ],
+    };
+    return base;
+  };
+
+  const handleNavigate = (target) => {
+    if (target === "Support Actions") setActivePage("support-actions");
+    else if (target === "Shopping Assistant") setActivePage("shopping-assistant");
+  };
+
+  const handleNavItemClick = (label) => {
+    if (label === "Support Actions") setActivePage("support-actions");
+    else if (label === "Shopping Assistant") setActivePage("shopping-assistant");
+    else if (label === "Chat") setActivePage("chat-settings");
+  };
+
+  // Render content based on active page
+  const renderContent = () => {
+    if (activePage === "support-actions") {
+      return <SupportActionsPage onBack={() => setActivePage("chat-settings")} />;
+    }
+    if (activePage === "shopping-assistant") {
+      return <ShoppingAssistantPage onBack={() => setActivePage("chat-settings")} />;
+    }
+    return (
+      <>
+        <SettingsContent
+          starters={starters}
+          setStarters={setStarters}
+          startersEnabled={startersEnabled}
+          setStartersEnabled={setStartersEnabled}
+          onNavigate={handleNavigate}
+        />
+        <ChatPreview
+          starters={starters}
+          enabled={startersEnabled}
+        />
+      </>
+    );
+  };
 
   return (
     <>
@@ -997,19 +1434,10 @@ function ConversationStartersSkillsPrototype() {
       <div style={css.page}>
         <div style={{ display: "flex", flexShrink: 0, height: "100%" }}>
           <IconRail activeId="ai-agent" />
-          <NavPanel />
+          <NavPanel config={getNavConfig()} onItemClick={handleNavItemClick} />
         </div>
         <div style={{ ...css.contentContainer, flexDirection: "row" }}>
-          <SettingsContent
-            starters={starters}
-            setStarters={setStarters}
-            startersEnabled={startersEnabled}
-            setStartersEnabled={setStartersEnabled}
-          />
-          <ChatPreview
-            starters={starters}
-            enabled={startersEnabled}
-          />
+          {renderContent()}
         </div>
       </div>
     </>
