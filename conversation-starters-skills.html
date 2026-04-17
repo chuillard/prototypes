@@ -430,31 +430,46 @@ function FlowMigrationNudge({ flowName, onNavigate }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// CONVERSATION STARTERS — Unified card (Skills + Flows only)
+// CONVERSATION STARTERS — Split cards (Skill prompts + Flows)
 // ════════════════════════════════════════════════════════════════
 
 const MAX_STARTERS = 8;
 
-function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, onNavigate }) {
+function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, onNavigate, filterType, title, description }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
   const [flowEditorIdx, setFlowEditorIdx] = useState(null);
   const [skillPopoverIdx, setSkillPopoverIdx] = useState(null);
   const [showSkillPicker, setShowSkillPicker] = useState(false);
 
-  const removeStarter = (i) => setStarters(starters.filter((_, idx) => idx !== i));
+  // Filter starters by type for this card
+  const displayedStarters = filterType ? starters.filter(s => s.type === filterType) : starters;
+
+  // Map a displayed-index back to the original starters array index
+  const origIdx = (i) => {
+    if (!filterType) return i;
+    const target = displayedStarters[i];
+    return starters.indexOf(target);
+  };
+
+  const removeStarter = (i) => {
+    const oi = origIdx(i);
+    setStarters(starters.filter((_, idx) => idx !== oi));
+  };
 
   const toggleEditing = (i) => {
+    const oi = origIdx(i);
     const n = [...starters];
-    n[i] = { ...n[i], editing: !n[i].editing };
+    n[oi] = { ...n[oi], editing: !n[oi].editing };
     setStarters(n);
   };
 
   // Per-type edit handler
   const handleEdit = (i) => {
-    const starter = starters[i];
+    const starter = displayedStarters[i];
+    const oi = origIdx(i);
     if (starter.type === "flow") {
-      setFlowEditorIdx(i);
+      setFlowEditorIdx(oi);
     } else if (starter.type === "skill") {
       // Skills are now renamable — toggle editing for the display text
       toggleEditing(i);
@@ -462,20 +477,32 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, 
   };
 
   const updateText = (i, text) => {
+    const oi = origIdx(i);
     const n = [...starters];
-    n[i] = { ...n[i], text };
+    n[oi] = { ...n[oi], text };
     setStarters(n);
   };
 
-  // Drag-and-drop handlers
+  // Drag-and-drop handlers — reorder within the filtered subset only
   const handleDragStart = (i) => setDragIdx(i);
   const handleDragOver = (e, i) => { e.preventDefault(); setDragOverIdx(i); };
   const handleDrop = (i) => {
     if (dragIdx === null || dragIdx === i) { setDragIdx(null); setDragOverIdx(null); return; }
-    const n = [...starters];
-    const [moved] = n.splice(dragIdx, 1);
-    n.splice(i, 0, moved);
-    setStarters(n);
+    if (filterType) {
+      // Reorder the filtered subset and rebuild the full array
+      const reordered = [...displayedStarters];
+      const [moved] = reordered.splice(dragIdx, 1);
+      reordered.splice(i, 0, moved);
+      const slots = starters.map((s, idx) => s.type === filterType ? idx : -1).filter(idx => idx >= 0);
+      const newStarters = [...starters];
+      slots.forEach((slotIdx, k) => { newStarters[slotIdx] = reordered[k]; });
+      setStarters(newStarters);
+    } else {
+      const n = [...starters];
+      const [moved] = n.splice(dragIdx, 1);
+      n.splice(i, 0, moved);
+      setStarters(n);
+    }
     setDragIdx(null);
     setDragOverIdx(null);
   };
@@ -504,8 +531,8 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, 
     </svg>
   );
 
-  // Find max clicks for relative sizing
-  const maxClicks = Math.max(...starters.map(s => s.clicks || 0), 1);
+  // Find max clicks for relative sizing (across the displayed subset)
+  const maxClicks = Math.max(...displayedStarters.map(s => s.clicks || 0), 1);
 
   // Tooltip wrapper
   const Tooltip = ({ children, text, width = 220 }) => {
@@ -578,20 +605,50 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, 
     );
   };
 
+  const isSkillCard = filterType === "skill";
+  const isFlowCard = filterType === "flow";
+  const cardTitle = title || (isSkillCard ? "Skill prompts" : isFlowCard ? "Flows" : "Conversation starters");
+  const cardDescription = description || (
+    isSkillCard
+      ? "Starters that trigger your AI Agent Skills. Shopper taps, Agent resolves end-to-end."
+      : isFlowCard
+        ? "Legacy Flow-based starters. Flows run a hardcoded path — they don't trigger AI Agent."
+        : "Help shoppers get answers faster. Skill-linked starters trigger the AI Agent automatically."
+  );
+
   return (
     <div style={{ background: tokens.bgWhite, borderRadius: 12, border: `1px solid ${tokens.border}`, padding: 24 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: tokens.text, margin: 0 }}>Conversation starters</h3>
+          {isSkillCard && (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.9"/>
+            </svg>
+          )}
+          {isFlowCard && (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M3 6h3a2 2 0 012 2v8a2 2 0 002 2h3" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+              <path d="M21 18h-3a2 2 0 01-2-2V8a2 2 0 00-2-2H11" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+              <circle cx="3" cy="6" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
+              <circle cx="21" cy="18" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
+            </svg>
+          )}
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: tokens.text, margin: 0 }}>{cardTitle}</h3>
+          {isFlowCard && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
+              background: "#FEF3C7", color: "#92400E", letterSpacing: "0.02em",
+            }}>LEGACY</span>
+          )}
         </div>
         <Toggle enabled={enabled} onToggle={() => setEnabled(!enabled)} />
       </div>
       <p style={{ fontSize: 14, color: tokens.textSecondary, margin: "0 0 16px", lineHeight: 1.5 }}>
-        Help shoppers get answers faster. Skill-linked starters trigger the AI Agent automatically.
+        {cardDescription}
       </p>
 
-      {/* ── Flows deprecation callout ── */}
-      {enabled && starters.some(s => s.type === "flow") && (
+      {/* ── Flows deprecation callout (only on Flows card) ── */}
+      {enabled && isFlowCard && displayedStarters.length > 0 && (
         <div style={{
           padding: "12px 16px", background: "#FFF7ED", borderRadius: 10,
           border: "1px solid #FDBA74", marginBottom: 16,
@@ -611,9 +668,21 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, 
         </div>
       )}
 
+      {enabled && displayedStarters.length === 0 && (
+        <div style={{
+          padding: "20px 16px", borderRadius: 10, background: tokens.grayLight,
+          border: `1px dashed ${tokens.border}`, textAlign: "center",
+          fontSize: 13, color: tokens.textMuted,
+        }}>
+          {isSkillCard
+            ? "No Skill prompts yet. Add one from an existing Skill below."
+            : "No Flows configured."}
+        </div>
+      )}
+
       {enabled && (
         <>
-          {starters.map((starter, i) => {
+          {displayedStarters.map((starter, i) => {
             const isEditing = starter.editing;
             const isDragTarget = dragOverIdx === i && dragIdx !== i;
             return (
@@ -627,7 +696,7 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, 
                   style={{ opacity: dragIdx === i ? 0.4 : 1, transition: "opacity 0.15s" }}>
                   <div style={{
                     display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                    borderBottom: i < starters.length - 1 ? `1px solid ${tokens.grayLight}` : "none",
+                    borderBottom: i < displayedStarters.length - 1 ? `1px solid ${tokens.grayLight}` : "none",
                     borderTop: isDragTarget ? `2px solid ${tokens.accent}` : "2px solid transparent",
                     position: "relative",
                   }}>
@@ -741,8 +810,8 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, 
             );
           })}
 
-          {/* Bottom action — only "Add from Skill" */}
-          {starters.length < MAX_STARTERS && (
+          {/* Bottom action — "Add from Skill" (only on Skill card) */}
+          {isSkillCard && starters.length < MAX_STARTERS && (
             <div style={{ marginTop: 14 }}>
               <button onClick={() => setShowSkillPicker(true)}
                 style={{
@@ -757,7 +826,12 @@ function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, 
               </button>
             </div>
           )}
-          <div style={{ marginTop: 8, fontSize: 12, color: tokens.textMuted }}>{starters.length} / {MAX_STARTERS} starters</div>
+          {/* Counter — global across both cards, only shown on Skill card to avoid duplication */}
+          {isSkillCard && (
+            <div style={{ marginTop: 8, fontSize: 12, color: tokens.textMuted }}>
+              {starters.length} / {MAX_STARTERS} starters total
+            </div>
+          )}
         </>
       )}
 
@@ -1271,7 +1345,7 @@ function ShoppingAssistantPage({ onBack }) {
 // ════════════════════════════════════════════════════════════════
 // SETTINGS PAGE CONTENT (Chat settings under Deploy > Chat)
 // ════════════════════════════════════════════════════════════════
-function SettingsContent({ starters, setStarters, startersEnabled, setStartersEnabled, onNavigate }) {
+function SettingsContent({ starters, setStarters, skillStartersEnabled, setSkillStartersEnabled, flowStartersEnabled, setFlowStartersEnabled, onNavigate }) {
   const [activeTab, setActiveTab] = useState("automation");
   const tabs = [
     { id: "appearance", label: "Appearance" },
@@ -1317,7 +1391,22 @@ function SettingsContent({ starters, setStarters, startersEnabled, setStartersEn
       <div style={{ flex: 1, overflowY: "auto" }}>
         {activeTab === "automation" ? (
           <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20, maxWidth: 680 }}>
-            <ConversationStartersCard starters={starters} setStarters={setStarters} enabled={startersEnabled} setEnabled={setStartersEnabled} onNavigate={onNavigate} />
+            <ConversationStartersCard
+              starters={starters}
+              setStarters={setStarters}
+              enabled={skillStartersEnabled}
+              setEnabled={setSkillStartersEnabled}
+              onNavigate={onNavigate}
+              filterType="skill"
+            />
+            <ConversationStartersCard
+              starters={starters}
+              setStarters={setStarters}
+              enabled={flowStartersEnabled}
+              setEnabled={setFlowStartersEnabled}
+              onNavigate={onNavigate}
+              filterType="flow"
+            />
             <OrderManagementCard />
           </div>
         ) : (
@@ -1342,7 +1431,8 @@ function ConversationStartersSkillsPrototype() {
     { text: "Tennis Racket Finder", type: "flow", editing: false, clicks: 482 },
     { text: "I need to manage my subscription", type: "flow", editing: false, clicks: 203 },
   ]);
-  const [startersEnabled, setStartersEnabled] = useState(true);
+  const [skillStartersEnabled, setSkillStartersEnabled] = useState(true);
+  const [flowStartersEnabled, setFlowStartersEnabled] = useState(true);
   // Page navigation: "chat-settings" | "support-actions" | "shopping-assistant"
   const [activePage, setActivePage] = useState("chat-settings");
 
@@ -1403,18 +1493,26 @@ function ConversationStartersSkillsPrototype() {
     if (activePage === "shopping-assistant") {
       return <ShoppingAssistantPage onBack={() => setActivePage("chat-settings")} />;
     }
+    // Pre-filter starters for ChatPreview based on each card's enabled state
+    const previewStarters = starters.filter(s =>
+      (s.type === "skill" && skillStartersEnabled) ||
+      (s.type === "flow" && flowStartersEnabled)
+    );
+    const anyEnabled = skillStartersEnabled || flowStartersEnabled;
     return (
       <>
         <SettingsContent
           starters={starters}
           setStarters={setStarters}
-          startersEnabled={startersEnabled}
-          setStartersEnabled={setStartersEnabled}
+          skillStartersEnabled={skillStartersEnabled}
+          setSkillStartersEnabled={setSkillStartersEnabled}
+          flowStartersEnabled={flowStartersEnabled}
+          setFlowStartersEnabled={setFlowStartersEnabled}
           onNavigate={handleNavigate}
         />
         <ChatPreview
-          starters={starters}
-          enabled={startersEnabled}
+          starters={previewStarters}
+          enabled={anyEnabled}
         />
       </>
     );
