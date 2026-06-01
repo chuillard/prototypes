@@ -4,7 +4,29 @@ Interactive UI prototypes for Gorgias product features.
 
 **Live index:** [chuillard.github.io/prototypes](https://chuillard.github.io/prototypes/)
 
-## Wizard: Conversation Starters Step (NEW)
+## In-app Testing At Scale (NEW)
+
+**File:** `in-app-testing-deploy.html`
+
+Edit an AI Agent skill, test it side-by-side with a live simulated shopper and an offline eval against past tickets, then publish via a deploy modal with traffic-split rollout options.
+
+### What's in the prototype
+
+- **Three-column test view:** instructions on the left (flex, gets most of the screen), interactive conversation in the middle, slim offline eval sidebar on the right
+- **Interactive simulated shopper:** type messages, hit Enter or Send; AI Agent shows a typing indicator and replies with keyword-matched canned responses (size swap, return, where is my order, discount, remove item)
+- **Test configuration row:** channel pill (Chat / Email / SMS) and target pill (New customer / Existing customer with email input / Specific ticket with ticket ID input)
+- **Offline eval panel:** time-window selector (7d / 30d / 90d / All time), headline automation-rate delta, three secondary metrics, three sample diff rows, "View all 27" link
+- **Deploy modal:** three preset rollout options (5% test, 50/50 A/B test, 100% full rollout) plus a custom traffic-share slider. Footer summarizes the chosen rollout.
+- **Single exit point:** "Exit test" button in the page header (no duplicate close affordances inside the panels)
+- **Publish changes button:** dark button shown by default when the skill is in draft state, opens the deploy modal
+
+### Context
+
+Companion to the [In-app Testing At Scale vision doc](https://www.notion.so/gorgias/Merchant-testing-vision-doc-36c1ae2178f580578111f02133c0cd7a) — closes the offline eval + A/B testing loop the doc proposes.
+
+---
+
+## Wizard: Conversation Starters Step
 
 **File:** `conversation-starters-step.html`
 

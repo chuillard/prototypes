@@ -1,0 +1,1302 @@
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+
+// ════════════════════════════════════════════════════════════════
+// In-app Testing At Scale — prototype v2
+//   - Default state: test view, draft pending, eval complete
+//   - 3-column test layout: instructions | conversation | eval sidebar
+//   - Single exit: "Exit test" in header (no duplicate cross)
+//   - Interactive conversation with canned AI responses
+//   - Editable eval params (time window)
+// ════════════════════════════════════════════════════════════════
+
+const tokens = {
+  purple: "#7C3AED",
+  purpleLight: "#EDE9FE",
+  purpleMid: "#A78BFA",
+  accent: "#7C3AED",
+  green: "#059669",
+  greenLight: "#D1FAE5",
+  red: "#EF4444",
+  yellow: "#F59E0B",
+  yellowLight: "#FEF3C7",
+  blue: "#1D4ED8",
+  blueLight: "#DBEAFE",
+  text: "#111827",
+  textSecondary: "#6B7280",
+  textMuted: "#9CA3AF",
+  border: "#E8E6DF",
+  bgPage: "#F7F6F3",
+  bgWhite: "#FFFFFF",
+  grayLight: "#F3F2EE",
+  railBg: "#F0EEF8",
+  railActive: "#EDE9FE",
+  railActiveText: "#6D28D9",
+  railInactive: "#4B5563",
+};
+
+const css = {
+  page: {
+    background: tokens.bgPage,
+    display: "flex",
+    flexDirection: "row",
+    height: "100vh",
+    padding: 8,
+    fontFamily: "Inter, sans-serif",
+    boxSizing: "border-box",
+  },
+  contentContainer: {
+    background: tokens.bgWhite,
+    borderRadius: 16,
+    border: `1px solid ${tokens.border}`,
+    overflow: "hidden",
+    flexGrow: 1,
+    display: "flex",
+    flexDirection: "column",
+  },
+};
+
+// ── Icon Rail ──────────────────────────────────────────────────
+function RailIcon({ active, children, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      width: 40, height: 40, borderRadius: 10,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      cursor: "pointer",
+      background: active ? tokens.railActive : "transparent",
+      color: active ? tokens.railActiveText : tokens.railInactive,
+    }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#E5E3F0"; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? tokens.railActive : "transparent"; }}
+    >
+      {children}
+    </div>
+  );
+}
+
+const defaultRailIcons = [
+  { id: "home", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 10.5L12 3l9 7.5V21H15v-5h-6v5H3V10.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg> },
+  { id: "search", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
+  { id: "notifications", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>, badge: 1 },
+  { id: "divider" },
+  { id: "tickets", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg> },
+  { id: "ai-agent", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="currentColor" opacity="0.9"/><circle cx="18" cy="6" r="2" fill="currentColor" opacity="0.6"/><circle cx="6" cy="18" r="1.5" fill="currentColor" opacity="0.5"/></svg> },
+  { id: "flows", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h3a2 2 0 012 2v8a2 2 0 002 2h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M21 18h-3a2 2 0 01-2-2V8a2 2 0 00-2-2H11" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><circle cx="3" cy="6" r="2" stroke="currentColor" strokeWidth="1.7"/><circle cx="21" cy="18" r="2" stroke="currentColor" strokeWidth="1.7"/></svg> },
+  { id: "revenue", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 7v10M9.5 9.5C9.5 8.67 10.67 8 12 8s2.5.67 2.5 1.5S13.33 11 12 11s-2.5.67-2.5 1.5S10.67 14.5 12 14.5s2.5-.67 2.5-1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: "customers", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="3" stroke="currentColor" strokeWidth="1.7"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M16 3.13a4 4 0 010 7.75M21 21v-2a4 4 0 00-3-3.87" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
+  { id: "analytics", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.7"/><rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.7"/><rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.7"/></svg> },
+];
+
+function IconRail({ activeId = "ai-agent" }) {
+  return (
+    <div style={{
+      width: 56, background: tokens.railBg,
+      display: "flex", flexDirection: "column", alignItems: "center",
+      padding: "10px 0", gap: 4,
+      borderRight: `1px solid ${tokens.border}`,
+      flexShrink: 0,
+    }}>
+      <div style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", borderRadius: 8, marginBottom: 6 }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M10 4L6 8l4 4" stroke="#4B5563" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M7 4L3 8l4 4" stroke="#4B5563" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {defaultRailIcons.map((item) => {
+        if (item.id === "divider") return <div key="divider" style={{ width: 28, height: 1, background: tokens.border, margin: "4px 0" }} />;
+        return (
+          <div key={item.id} style={{ position: "relative" }}>
+            <RailIcon active={activeId === item.id}>{item.icon}</RailIcon>
+            {item.badge != null && (
+              <div style={{
+                position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: "50%",
+                background: tokens.red, display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, fontWeight: 700, color: "#fff",
+                border: `2px solid ${tokens.railBg}`, lineHeight: 1,
+              }}>{item.badge}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Nav Panel ──────────────────────────────────────────────────
+function NavSection({ label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px 4px", cursor: "pointer" }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textSecondary, letterSpacing: "0.01em" }}>{label}</span>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 10l4-4 4 4" stroke="#9CA3AF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </div>
+  );
+}
+
+function NavSubItem({ label, isActive, badge, count, dot }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center",
+      padding: "7px 8px 7px 14px",
+      borderRadius: 8, cursor: "pointer",
+      background: isActive ? tokens.railActive : "transparent",
+      gap: 6,
+    }}
+      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#F3F2F8"; }}
+      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? tokens.railActive : "transparent"; }}
+    >
+      <span style={{ fontSize: 14, color: isActive ? tokens.railActiveText : tokens.text, fontWeight: isActive ? 600 : 400, flex: 1 }}>{label}</span>
+      {badge && <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 6, background: tokens.purpleLight, color: tokens.railActiveText }}>{badge}</span>}
+      {count != null && <span style={{ fontSize: 14, color: tokens.text }}>{count}</span>}
+      {dot && <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />}
+    </div>
+  );
+}
+
+function NavTopItem({ label }) {
+  return (
+    <div style={{ padding: "8px 8px", cursor: "pointer", borderRadius: 8 }}
+      onMouseEnter={e => e.currentTarget.style.background = "#F3F2F8"}
+      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+    >
+      <span style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>{label}</span>
+    </div>
+  );
+}
+
+function ShopifyAccountRow({ storeName = "ptg5yc-z1" }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 10px", borderBottom: `1px solid ${tokens.border}` }}>
+      <svg width="26" height="26" viewBox="0 0 44 44" fill="none">
+        <rect width="44" height="44" rx="8" fill="#96BF48"/>
+        <path d="M30 15s-.1-.8-.6-1.3c-.5-.5-1.2-.8-1.2-.8s-.1-1.3-.3-2c-.3-1.3-1.5-2-2.8-1.8l-.4.1C24 8.4 23 8 22 8c-2 0-3 1.5-3.3 2.9l-3.4.7c-.5.1-.9.6-.9 1.1l-.4 14 11.8 2 4-1.2L30 15zm-8-5.5c.5 0 1 .2 1.4.5l-3 .6c.3-1 .9-1.1 1.6-1.1zm-3.5 4.8l4.6-.9c-.3-.8-.8-1.3-1.1-1.6l-3.8.8.3 1.7zm7.3-1.5c-.3-.3-.8-.7-1.5-.9l-4.4.9-.2-1.5 3-.6c.1-.5.3-1 .5-1.3.5.2.9.5 1.3.9.6.6.8 1.4.8 1.5h.5z" fill="white"/>
+        <path d="M14 37l2-11 8 1.5L22 37H14z" fill="#5E8E3E"/>
+        <path d="M22 27.5l2 9.5h6l-2-11-6 1.5z" fill="#5E8E3E"/>
+      </svg>
+      <span style={{ fontSize: 14, fontWeight: 500, color: tokens.text }}>{storeName}</span>
+      <div style={{ marginLeft: "auto", width: 10, height: 10, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+    </div>
+  );
+}
+
+function NavPanel() {
+  return (
+    <div style={{
+      width: 220, background: tokens.bgWhite,
+      display: "flex", flexDirection: "column",
+      borderRight: `1px solid ${tokens.border}`,
+      overflowY: "auto", flexShrink: 0,
+    }}>
+      <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${tokens.border}` }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: tokens.text, letterSpacing: "-0.02em" }}>AI Agent</span>
+      </div>
+      <ShopifyAccountRow />
+      <div style={{ padding: "8px 8px", display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
+        <NavSection label="Analyze" />
+        <NavSubItem label="Overview" />
+        <NavSubItem label="Intents" />
+        <NavSubItem label="Opportunities" badge="Beta" />
+        <NavSection label="Train" />
+        <NavSubItem label="Skills" badge="New" isActive />
+        <NavSubItem label="Knowledge" />
+        <NavSubItem label="Tone of Voice" />
+        <NavSubItem label="Support Actions" />
+        <NavSubItem label="Products" />
+        <NavSubItem label="Shopping Assistant" />
+        <NavTopItem label="Test" />
+        <NavSection label="Deploy" />
+        <NavSubItem label="Chat" dot />
+        <NavSubItem label="Email" dot />
+        <NavSubItem label="SMS" dot />
+        <NavTopItem label="Settings" />
+      </div>
+      <div style={{ padding: "10px 12px 14px" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "8px 10px",
+          background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+          borderRadius: 999, cursor: "pointer",
+        }}>
+          <div style={{ width: 22, height: 22, borderRadius: "50%", background: "linear-gradient(135deg, #F59E0B, #EF4444)" }} />
+          <span style={{ fontSize: 13, fontWeight: 500, color: tokens.text, flex: 1 }}>Ask Gaia</span>
+          <span style={{ fontSize: 11, color: tokens.textMuted, background: tokens.grayLight, padding: "1px 6px", borderRadius: 4 }}>⌘ + G</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Buttons ────────────────────────────────────────────────────
+function ButtonSecondary({ children, onClick, style = {} }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: "7px 14px", borderRadius: 8,
+      border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+      fontSize: 13, fontWeight: 500, cursor: "pointer", color: tokens.text,
+      display: "inline-flex", alignItems: "center", gap: 6,
+      ...style,
+    }}>{children}</button>
+  );
+}
+
+function ButtonDark({ children, onClick, style = {} }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: "7px 14px", borderRadius: 8,
+      background: "#111827", color: "#fff", border: "none",
+      fontSize: 13, fontWeight: 600, cursor: "pointer",
+      display: "inline-flex", alignItems: "center", gap: 6,
+      ...style,
+    }}>{children}</button>
+  );
+}
+
+function StatusPill({ status }) {
+  const styles = {
+    Enabled: { bg: tokens.greenLight, color: tokens.green, border: "#A7F3D0" },
+    Draft:   { bg: "#FEF9C3", color: "#854D0E", border: "#FDE68A" },
+    Disabled:{ bg: tokens.grayLight, color: tokens.textSecondary, border: tokens.border },
+  }[status] || { bg: tokens.grayLight, color: tokens.textSecondary, border: tokens.border };
+  return (
+    <span style={{
+      fontSize: 12, padding: "3px 10px", borderRadius: 20, fontWeight: 500,
+      background: styles.bg, color: styles.color, border: `1px solid ${styles.border}`,
+    }}>{status}</span>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// EDITOR — instructions block
+// ════════════════════════════════════════════════════════════════
+const INITIAL_INSTRUCTIONS = [
+  { kind: "h", text: "1. Order identification" },
+  { kind: "p", text: "**IF** the customer doesn't mention any specific order, **THEN** assume they are referring to their last order." },
+  { kind: "p", text: "**IF** no order data is found using the information available in the conversation, **THEN**:\nAsk the customer for their order number, name, email, or shipping address.\nAttempt to locate the order again." },
+  { kind: "h", text: "2. Clarify the modification" },
+  { kind: "p", text: "**IF** the customer hasn't specified, **THEN** ask whether they want to:" },
+  { kind: "li", items: ["Remove an item from the order.", "Replace an item with a different one (e.g., different size, color, or product)."] },
+  { kind: "h", text: "3. Modification eligibility" },
+  { kind: "p", text: "**IF** {{Order: Created datetime}} is less than 2 days ago and {{Order: Fulfillment - Status}} = 'Unfulfilled', **THEN**:" },
+  { kind: "action", text: "Use action: Replace item" },
+  { kind: "p", text: "**IF** {{Order: Created datetime}} is more than 2 days ago, or the order is already fulfilled, **THEN**:" },
+  { kind: "li", items: ["Inform the customer the order has already been processed and can no longer be modified.", "Let them know they can return or exchange items once delivered.", "Close the ticket."] },
+];
+
+function renderInline(text) {
+  const parts = [];
+  let key = 0;
+  let remaining = text;
+  while (remaining.length) {
+    const boldMatch = remaining.match(/^\*\*(.+?)\*\*/);
+    const varMatch = remaining.match(/^\{\{(.+?)\}\}/);
+    if (boldMatch) {
+      parts.push(<strong key={key++} style={{ fontWeight: 700 }}>{boldMatch[1]}</strong>);
+      remaining = remaining.slice(boldMatch[0].length);
+    } else if (varMatch) {
+      parts.push(
+        <span key={key++} style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "1px 6px 1px 4px", borderRadius: 4,
+          background: "#F0FDF4", border: "1px solid #BBF7D0",
+          fontSize: 12.5, color: "#166534", whiteSpace: "nowrap",
+        }}>
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><rect width="12" height="12" rx="2" fill="#96BF48"/></svg>
+          {varMatch[1]}
+        </span>
+      );
+      remaining = remaining.slice(varMatch[0].length);
+    } else {
+      const nextSpecial = remaining.search(/\*\*|\{\{/);
+      const chunk = nextSpecial === -1 ? remaining : remaining.slice(0, nextSpecial);
+      const lines = chunk.split("\n");
+      lines.forEach((line, i) => {
+        parts.push(<span key={key++}>{line}</span>);
+        if (i < lines.length - 1) parts.push(<br key={key++} />);
+      });
+      remaining = nextSpecial === -1 ? "" : remaining.slice(nextSpecial);
+    }
+  }
+  return parts;
+}
+
+function InstructionsBlock({ blocks, compact = false }) {
+  return (
+    <div style={{
+      border: `1px solid ${tokens.border}`, borderRadius: 12,
+      padding: compact ? "18px 20px" : "26px 32px",
+      background: tokens.bgWhite,
+      fontSize: compact ? 13 : 14.5,
+      lineHeight: 1.7,
+      color: tokens.text,
+    }}>
+      {blocks.map((b, i) => {
+        if (b.kind === "h") {
+          return <h3 key={i} style={{
+            margin: i === 0 ? "0 0 12px" : "20px 0 10px",
+            fontSize: compact ? 15 : 20, fontWeight: 700, color: tokens.text,
+            letterSpacing: "-0.01em",
+          }}>{b.text}</h3>;
+        }
+        if (b.kind === "p") return <p key={i} style={{ margin: "0 0 10px" }}>{renderInline(b.text)}</p>;
+        if (b.kind === "li") return (
+          <ul key={i} style={{ margin: "0 0 10px", paddingLeft: 20 }}>
+            {b.items.map((it, j) => <li key={j} style={{ marginBottom: 3 }}>{renderInline(it)}</li>)}
+          </ul>
+        );
+        if (b.kind === "action") return (
+          <div key={i} style={{ margin: "0 0 10px" }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "3px 8px 3px 6px", borderRadius: 6,
+              background: tokens.purpleLight, border: "1px solid #DDD6FE",
+              fontSize: 13, color: "#5B21B6", fontWeight: 500,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1l1.5 3.5L11 5l-2.7 2.2L9 11 6 9 3 11l.7-3.8L1 5l3.5-.5L6 1z" fill="#7C3AED"/>
+              </svg>
+              <strong style={{ fontWeight: 600 }}>Use action:</strong> {b.text.replace("Use action: ", "")}
+            </span>
+          </div>
+        );
+        return null;
+      })}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// INFO PANEL (edit mode right rail)
+// ════════════════════════════════════════════════════════════════
+function InfoPanel({ status }) {
+  return (
+    <div style={{
+      width: 320, flexShrink: 0,
+      borderLeft: `1px solid ${tokens.border}`,
+      background: tokens.bgWhite,
+      padding: "20px 22px 24px",
+      overflowY: "auto",
+      display: "flex", flexDirection: "column", gap: 22,
+    }}>
+      <div>
+        <h3 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 700, color: tokens.text }}>Info</h3>
+        <div style={{ fontSize: 14, color: tokens.text, fontWeight: 600, marginBottom: 12 }}>Details</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13.5 }}>
+          <Row label="Status"><StatusPill status={status} /></Row>
+          <Row label="Created"><span style={{ color: tokens.text }}>May 25, 2026</span></Row>
+          <Row label="Last updated"><span style={{ color: tokens.text }}>{status === "Draft" ? "June 1, 2026" : "May 25, 2026"}</span></Row>
+        </div>
+      </div>
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>Intents</span>
+          <span style={{ color: tokens.red, fontWeight: 600 }}>*</span>
+          <span style={{ fontSize: 12, padding: "1px 7px", borderRadius: 4, background: tokens.grayLight, color: tokens.textSecondary, fontWeight: 500 }}>1</span>
+        </div>
+        <p style={{ margin: "0 0 12px", fontSize: 12.5, color: tokens.textSecondary, lineHeight: 1.5 }}>
+          When AI Agent detects one of these intents in a conversation, it will follow this skill's instructions.
+        </p>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "3px 8px 3px 10px", borderRadius: 6,
+          background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+          fontSize: 12.5, color: tokens.text,
+        }}>
+          Order / Edit <span style={{ color: tokens.textMuted, cursor: "pointer" }}>×</span>
+        </span>
+        <div style={{ marginTop: 10, fontSize: 13, color: tokens.accent, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>+ Link intents</div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, children }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ color: tokens.textSecondary }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// EVAL SIDEBAR — slim right panel in test mode
+// ════════════════════════════════════════════════════════════════
+const TIME_WINDOWS = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"];
+const SAMPLE_SIZES = { "Last 7 days": 42, "Last 30 days": 142, "Last 90 days": 387, "All time": 1240 };
+
+function EvalSidebar({ running, complete, onRerun }) {
+  const [timeWindow, setTimeWindow] = useState("Last 30 days");
+  const [openParams, setOpenParams] = useState(false);
+  const sampleSize = SAMPLE_SIZES[timeWindow];
+
+  const handleTimeChange = (tw) => {
+    setTimeWindow(tw);
+    setOpenParams(false);
+    onRerun();
+  };
+
+  return (
+    <div style={{
+      width: 340, flexShrink: 0,
+      background: "#FAFAF9",
+      display: "flex", flexDirection: "column",
+      overflow: "hidden",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "14px 18px 12px",
+        borderBottom: `1px solid ${tokens.border}`,
+        background: tokens.bgWhite,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 6, background: tokens.purpleLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M3 13V3M3 13h10M6 10V7M9 10V5M12 10V8" stroke={tokens.accent} strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>Offline eval</span>
+        </div>
+        <button onClick={onRerun} title="Re-run eval" style={{
+          width: 26, height: 26, borderRadius: 6,
+          border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path d="M14 8a6 6 0 11-2-4.5M14 3v3h-3" stroke="#4B5563" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Parameters bar */}
+      <div style={{ padding: "10px 18px", borderBottom: `1px solid ${tokens.border}`, background: tokens.bgWhite, position: "relative" }}>
+        <div onClick={() => setOpenParams(!openParams)} style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "5px 10px", borderRadius: 999,
+          border: `1px solid ${tokens.border}`,
+          fontSize: 12.5, color: tokens.text,
+          cursor: "pointer", background: tokens.bgWhite,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="3" width="12" height="11" rx="2" stroke="#6B7280" strokeWidth="1.4"/>
+            <path d="M2 6h12M6 1v3M10 1v3" stroke="#6B7280" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          {timeWindow}
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </div>
+        <span style={{ fontSize: 12, color: tokens.textMuted, marginLeft: 8 }}>
+          {sampleSize} tickets · Order / Edit
+        </span>
+        {openParams && (
+          <div style={{
+            position: "absolute", top: "100%", left: 18, marginTop: 4,
+            background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+            borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+            padding: 6, minWidth: 160, zIndex: 20,
+          }}>
+            {TIME_WINDOWS.map(tw => (
+              <div key={tw} onClick={() => handleTimeChange(tw)} style={{
+                padding: "7px 10px", borderRadius: 6, cursor: "pointer",
+                fontSize: 13, color: tokens.text,
+                background: tw === timeWindow ? tokens.purpleLight : "transparent",
+                fontWeight: tw === timeWindow ? 600 : 400,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}
+                onMouseEnter={e => { if (tw !== timeWindow) e.currentTarget.style.background = tokens.grayLight; }}
+                onMouseLeave={e => { if (tw !== timeWindow) e.currentTarget.style.background = "transparent"; }}
+              >
+                {tw}
+                <span style={{ fontSize: 11, color: tokens.textMuted }}>{SAMPLE_SIZES[tw]}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 18px 24px" }}>
+        {running ? <EvalRunning sampleSize={sampleSize} /> : complete ? <EvalResults /> : <EvalEmpty onRun={onRerun} />}
+      </div>
+    </div>
+  );
+}
+
+function EvalEmpty({ onRun }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", padding: 16 }}>
+      <div style={{ fontSize: 13, color: tokens.textSecondary, marginBottom: 12 }}>No eval results yet</div>
+      <button onClick={onRun} style={{
+        padding: "7px 14px", borderRadius: 8, border: "none",
+        background: tokens.accent, color: "#fff",
+        fontSize: 13, fontWeight: 600, cursor: "pointer",
+      }}>Run eval</button>
+    </div>
+  );
+}
+
+function EvalRunning({ sampleSize }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", padding: 16 }}>
+      <svg width="32" height="32" viewBox="0 0 50 50" style={{ marginBottom: 12 }}>
+        <circle cx="25" cy="25" r="20" stroke={tokens.purpleLight} strokeWidth="4" fill="none"/>
+        <circle cx="25" cy="25" r="20" stroke={tokens.accent} strokeWidth="4" fill="none" strokeLinecap="round" strokeDasharray="60 126">
+          <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1.2s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+      <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text, marginBottom: 2 }}>Running eval…</div>
+      <div style={{ fontSize: 11.5, color: tokens.textMuted }}>Replaying {sampleSize} tickets</div>
+    </div>
+  );
+}
+
+function EvalResults() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Headline verdict */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 16, height: 16, borderRadius: "50%", background: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/></svg>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#14532D", textTransform: "uppercase", letterSpacing: "0.04em" }}>Likely improvement</span>
+        </div>
+        <div style={{
+          padding: "14px 16px", borderRadius: 12,
+          background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+        }}>
+          <div style={{ fontSize: 12, color: tokens.textSecondary, marginBottom: 4 }}>Automation rate</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{ fontSize: 26, fontWeight: 700, color: tokens.text, letterSpacing: "-0.02em" }}>63.3%</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#16A34A" }}>+8.4 pts</span>
+          </div>
+          <div style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 2 }}>was 54.9% on the live version</div>
+        </div>
+      </div>
+
+      {/* Secondary metrics */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, border: `1px solid ${tokens.border}`, borderRadius: 10, background: tokens.bgWhite, overflow: "hidden" }}>
+        <MiniRow label="Success rate" value="78.2%" delta="+7.2" positive />
+        <MiniRow label="Handover rate" value="22.1%" delta="−5.9" positive />
+        <MiniRow label="Resolution turns" value="2.7" delta="−0.5" positive />
+      </div>
+
+      {/* Diffs */}
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textSecondary, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+          Sample changes
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <DiffRow trend="up" ticket="#48521" text="Size swap — auto-resolved" />
+          <DiffRow trend="up" ticket="#48199" text="Gift wrap removal — auto-resolved" />
+          <DiffRow trend="warn" ticket="#47512" text="Replace on shipped order — escalated" />
+        </div>
+        <a style={{
+          display: "inline-block", marginTop: 10,
+          fontSize: 12.5, color: tokens.accent, cursor: "pointer", fontWeight: 500,
+        }}>View all 27 diffs →</a>
+      </div>
+    </div>
+  );
+}
+
+function MiniRow({ label, value, delta, positive }) {
+  return (
+    <div style={{
+      padding: "9px 12px", display: "flex", alignItems: "center", justifyContent: "space-between",
+      borderBottom: `1px solid ${tokens.border}`, fontSize: 13, gap: 8,
+    }}>
+      <span style={{ color: tokens.textSecondary, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        <span style={{ color: tokens.text, fontWeight: 500 }}>{value}</span>
+        <span style={{
+          fontSize: 11.5, fontWeight: 600,
+          color: positive ? "#16A34A" : "#DC2626",
+          padding: "1px 6px", borderRadius: 4,
+          background: positive ? "#DCFCE7" : "#FEE2E2",
+        }}>{delta}</span>
+      </div>
+    </div>
+  );
+}
+
+function DiffRow({ trend, ticket, text }) {
+  const col = trend === "up" ? "#16A34A" : "#D97706";
+  const bg = trend === "up" ? "#DCFCE7" : "#FEF3C7";
+  return (
+    <div style={{
+      padding: "7px 10px", borderRadius: 8,
+      background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+      display: "flex", alignItems: "center", gap: 8,
+    }}>
+      <div style={{ width: 16, height: 16, borderRadius: 4, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {trend === "up" ? (
+          <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 9L9 2M9 2H4M9 2v5" stroke={col} strokeWidth="1.8" strokeLinecap="round"/></svg>
+        ) : (
+          <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M6 1v8M3 6l3 3 3-3" stroke={col} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        )}
+      </div>
+      <span style={{ fontSize: 12, color: tokens.text, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span style={{ color: tokens.textMuted }}>{ticket}</span> · {text}
+      </span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// CONVERSATION PREVIEW — interactive, center column
+// ════════════════════════════════════════════════════════════════
+const CANNED = [
+  {
+    match: /size|swap|larger|smaller|medium|large|small|exchange/i,
+    reply: "Got it — order #48521 is still unfulfilled, so I can swap the medium for a large with no extra charge. You'll get a confirmation email in a few minutes. Anything else?",
+    reasoning: "Order #48521 matched · created 1 day ago · status Unfulfilled · eligibility passed · calling Replace item action.",
+  },
+  {
+    match: /remove|cancel item|take out/i,
+    reply: "Of course. Your order #48521 is still unfulfilled, so I can remove that item and refund $24.00 to your original payment method. Anything else I can help with?",
+    reasoning: "Order #48521 matched · status Unfulfilled · within 2-day window · calling Remove item action.",
+  },
+  {
+    match: /where|track|status|when.*arrive|shipped|delivery/i,
+    reply: "Your order #48521 was placed yesterday and is currently being prepared at the warehouse. You'll get a tracking link by email as soon as it ships, typically within 1–2 business days.",
+    reasoning: "Order / Status intent detected · fallback to default agent · used tracking lookup.",
+  },
+  {
+    match: /return|refund/i,
+    reply: "I can help you start a return. Since your order hasn't shipped yet, you can also modify it directly — would you prefer to cancel the item or wait until it arrives to return it?",
+    reasoning: "Return / Request intent · current skill (Order / Edit) suggests in-order modification when unfulfilled.",
+  },
+  {
+    match: /discount|code|promo|coupon/i,
+    reply: "I don't have a discount code to share, but I can pass your request along to the team. Is there anything else I can help with on your order?",
+    reasoning: "Promotion intent · handover topic · no auto-discount allowed.",
+  },
+];
+
+const INITIAL_MESSAGES = [
+  { id: 1, role: "shopper", text: "Hi! I need to swap one of the items in my order, can you help?" },
+  {
+    id: 2, role: "agent",
+    text: "Hi! Of course — I can help with that. Could you share your order number, or the email you used at checkout?",
+    reasoning: "Order / Edit intent detected · no order context yet · prompting for identifier per step 1.",
+  },
+];
+
+const CHANNEL_OPTIONS = [
+  { id: "chat", label: "Chat", icon: <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M2 4a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6l-3 3V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
+  { id: "email", label: "Email", icon: <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><path d="M2.5 4l5.5 4 5.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  { id: "sms", label: "SMS", icon: <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 3h8a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M5 7h6M5 9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+];
+
+const TARGET_OPTIONS = [
+  { id: "new", label: "New customer" },
+  { id: "existing", label: "Existing customer" },
+  { id: "ticket", label: "Specific ticket" },
+];
+
+function ConfigPill({ label, icon, value, options, onChange, width }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <div onClick={() => setOpen(!open)} style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "5px 10px 5px 9px", borderRadius: 8,
+        border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+        cursor: "pointer", fontSize: 12.5, color: tokens.text,
+        whiteSpace: "nowrap",
+      }}>
+        <span style={{ color: tokens.textMuted, fontSize: 11.5 }}>{label}:</span>
+        {icon && <span style={{ color: tokens.textSecondary, display: "inline-flex" }}>{icon}</span>}
+        <span style={{ fontWeight: 500 }}>{value}</span>
+        <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </div>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 5 }} />
+          <div style={{
+            position: "absolute", top: "100%", left: 0, marginTop: 4,
+            background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+            borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+            padding: 4, minWidth: width || 150, zIndex: 10,
+          }}>
+            {options.map(opt => {
+              const isOn = opt.label === value || opt.id === value;
+              return (
+                <div key={opt.id || opt.label} onClick={() => { onChange(opt); setOpen(false); }} style={{
+                  padding: "7px 10px", borderRadius: 6, cursor: "pointer",
+                  fontSize: 13, color: tokens.text,
+                  background: isOn ? tokens.purpleLight : "transparent",
+                  fontWeight: isOn ? 600 : 400,
+                  display: "flex", alignItems: "center", gap: 7,
+                }}
+                  onMouseEnter={e => { if (!isOn) e.currentTarget.style.background = tokens.grayLight; }}
+                  onMouseLeave={e => { if (!isOn) e.currentTarget.style.background = "transparent"; }}
+                >
+                  {opt.icon && <span style={{ color: tokens.textSecondary, display: "inline-flex" }}>{opt.icon}</span>}
+                  {opt.label}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ConvoPreview({ onReset }) {
+  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const [input, setInput] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [channel, setChannel] = useState(CHANNEL_OPTIONS[0]);
+  const [target, setTarget] = useState(TARGET_OPTIONS[0]);
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [ticketId, setTicketId] = useState("");
+  const endRef = useRef(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, typing]);
+
+  const send = (text) => {
+    const trimmed = (text || input).trim();
+    if (!trimmed) return;
+    const userMsg = { id: Date.now(), role: "shopper", text: trimmed };
+    setMessages(m => [...m, userMsg]);
+    setInput("");
+    setTyping(true);
+    setTimeout(() => {
+      const match = CANNED.find(c => c.match.test(trimmed));
+      const reply = match ? match :
+        { reply: "Thanks for sharing — could you give me a bit more detail (your order number, or what you'd like to do)?", reasoning: "No matching intent · prompting for clarification." };
+      const agentMsg = { id: Date.now() + 1, role: "agent", text: reply.reply, reasoning: reply.reasoning };
+      setMessages(m => [...m, agentMsg]);
+      setTyping(false);
+    }, 950);
+  };
+
+  const reset = () => {
+    setMessages(INITIAL_MESSAGES);
+    setInput("");
+    setTyping(false);
+    onReset?.();
+  };
+
+  return (
+    <div style={{
+      width: 480, flexShrink: 0,
+      background: tokens.bgWhite,
+      display: "flex", flexDirection: "column",
+      overflow: "hidden",
+      borderRight: `1px solid ${tokens.border}`,
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "12px 20px 10px", borderBottom: `1px solid ${tokens.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div style={{ fontSize: 14.5, fontWeight: 600, color: tokens.text, display: "flex", alignItems: "center", gap: 8 }}>
+          Conversation preview
+          <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: "#FEF3C7", color: "#92400E", letterSpacing: "0.02em" }}>DRAFT</span>
+        </div>
+        <button onClick={reset} title="Reset conversation" style={{
+          padding: "5px 10px", borderRadius: 7,
+          border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+          cursor: "pointer", fontSize: 12, color: tokens.textSecondary,
+          display: "inline-flex", alignItems: "center", gap: 5,
+        }}>
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+            <path d="M14 8a6 6 0 11-2-4.5M14 3v3h-3" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Reset
+        </button>
+      </div>
+
+      {/* Test config row */}
+      <div style={{
+        padding: "10px 20px", borderBottom: `1px solid ${tokens.border}`,
+        background: "#FBFAF8",
+        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+      }}>
+        <ConfigPill
+          label="Channel"
+          icon={channel.icon}
+          value={channel.label}
+          options={CHANNEL_OPTIONS}
+          onChange={(opt) => setChannel(opt)}
+        />
+        <ConfigPill
+          label="Target"
+          value={target.label}
+          options={TARGET_OPTIONS}
+          onChange={(opt) => setTarget(opt)}
+          width={180}
+        />
+        {target.id === "existing" && (
+          <input
+            value={customerEmail}
+            onChange={e => setCustomerEmail(e.target.value)}
+            placeholder="customer@email.com"
+            style={{
+              padding: "5px 10px", borderRadius: 8,
+              border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+              fontSize: 12.5, color: tokens.text, outline: "none", width: 200,
+              fontFamily: "Inter, sans-serif",
+            }}
+          />
+        )}
+        {target.id === "ticket" && (
+          <input
+            value={ticketId}
+            onChange={e => setTicketId(e.target.value)}
+            placeholder="#48521"
+            style={{
+              padding: "5px 10px", borderRadius: 8,
+              border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+              fontSize: 12.5, color: tokens.text, outline: "none", width: 120,
+              fontFamily: "Inter, sans-serif",
+            }}
+          />
+        )}
+        <span style={{ fontSize: 11.5, color: tokens.textMuted, marginLeft: "auto" }}>
+          Preview only · no real messages sent
+        </span>
+      </div>
+
+      {/* Messages */}
+      <div style={{
+        flex: 1, overflowY: "auto",
+        padding: "20px 24px",
+        display: "flex", flexDirection: "column", gap: 14,
+        background: "#FBFAF8",
+      }}>
+        {messages.map(m => m.role === "shopper" ? <BubbleShopper key={m.id} text={m.text} /> : <BubbleAgent key={m.id} text={m.text} />)}
+        {typing && <Typing />}
+        <div ref={endRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: "14px 20px 18px", borderTop: `1px solid ${tokens.border}`, background: tokens.bgWhite }}>
+        <div style={{
+          border: `1px solid ${tokens.border}`, borderRadius: 12,
+          padding: "10px 12px",
+          display: "flex", flexDirection: "column", gap: 10,
+          background: tokens.bgWhite,
+        }}>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") send(); }}
+            placeholder="Write your message…"
+            style={{
+              border: "none", outline: "none", fontSize: 13.5,
+              color: tokens.text, background: "transparent", fontFamily: "Inter, sans-serif",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <Chip label="Where is my order?" onClick={() => send("Where is my order?")} />
+              <Chip label="Swap medium for large" onClick={() => send("Can I swap the medium for a large?")} />
+              <Chip label="Remove an item" onClick={() => send("Can you remove an item from my order?")} />
+            </div>
+            <button onClick={() => send()} style={{
+              padding: "6px 16px", borderRadius: 8, border: "none",
+              background: input.trim() ? "#111827" : "#9CA3AF", color: "#fff",
+              fontSize: 12.5, fontWeight: 600,
+              cursor: input.trim() ? "pointer" : "not-allowed",
+              transition: "background 0.15s",
+            }}>Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Chip({ label, onClick }) {
+  return (
+    <span onClick={onClick} style={{
+      padding: "3px 10px", borderRadius: 999,
+      background: tokens.grayLight,
+      fontSize: 11.5, color: tokens.textSecondary, cursor: "pointer",
+      whiteSpace: "nowrap", transition: "background 0.15s",
+    }}
+      onMouseEnter={e => e.currentTarget.style.background = "#E5E3DD"}
+      onMouseLeave={e => e.currentTarget.style.background = tokens.grayLight}
+    >{label}</span>
+  );
+}
+
+function BubbleShopper({ text }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div style={{
+        maxWidth: "78%",
+        background: tokens.purpleLight, color: "#3B0764",
+        padding: "10px 14px", borderRadius: 14, borderTopRightRadius: 4,
+        fontSize: 13.5, lineHeight: 1.45,
+      }}>{text}</div>
+    </div>
+  );
+}
+
+function BubbleAgent({ text }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-start", maxWidth: "82%" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "linear-gradient(135deg, #C084FC, #7C3AED)" }} />
+        <span style={{ fontSize: 11, color: tokens.textSecondary, fontWeight: 500 }}>AI Agent</span>
+      </div>
+      <div style={{
+        background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+        padding: "10px 14px", borderRadius: 14, borderTopLeftRadius: 4,
+        fontSize: 13.5, lineHeight: 1.5, color: tokens.text,
+      }}>{text}</div>
+    </div>
+  );
+}
+
+function Typing() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "linear-gradient(135deg, #C084FC, #7C3AED)" }} />
+        <span style={{ fontSize: 11, color: tokens.textSecondary, fontWeight: 500 }}>AI Agent</span>
+      </div>
+      <div style={{
+        background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+        padding: "12px 14px", borderRadius: 14, borderTopLeftRadius: 4,
+        display: "inline-flex", gap: 4, alignItems: "center",
+      }}>
+        <Dot delay={0} />
+        <Dot delay={0.15} />
+        <Dot delay={0.3} />
+      </div>
+    </div>
+  );
+}
+
+function Dot({ delay }) {
+  return (
+    <span style={{
+      display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+      background: tokens.textMuted,
+      animation: `gorgiasTypingPulse 1s ease-in-out ${delay}s infinite`,
+    }} />
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// DEPLOY MODAL
+// ════════════════════════════════════════════════════════════════
+function DeployModal({ open, onClose, onDeploy }) {
+  const [choice, setChoice] = useState("test");
+  const [custom, setCustom] = useState(25);
+
+  if (!open) return null;
+
+  const summary = {
+    test:   { volume: "5% of traffic",   label: "Test on a slice" },
+    ab:     { volume: "50% / 50% split", label: "A/B test against current version" },
+    full:   { volume: "100% of traffic", label: "Full rollout to everyone" },
+    custom: { volume: `${custom}% of traffic`, label: "Custom rollout" },
+  }[choice];
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", zIndex: 100 }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: 640, maxWidth: "94vw", maxHeight: "90vh",
+        background: tokens.bgWhite, borderRadius: 16,
+        boxShadow: "0 18px 60px rgba(0,0,0,0.18)",
+        zIndex: 101, display: "flex", flexDirection: "column",
+        fontFamily: "Inter, sans-serif", overflow: "hidden",
+      }}>
+        <div style={{ padding: "22px 26px 16px", borderBottom: `1px solid ${tokens.border}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: tokens.text, marginBottom: 4 }}>Deploy your changes</div>
+              <div style={{ fontSize: 13.5, color: tokens.textSecondary, lineHeight: 1.5 }}>
+                Pick how to roll out the new version of <strong style={{ color: tokens.text, fontWeight: 600 }}>Product edits in an order</strong>. You can change the rollout later.
+              </div>
+            </div>
+            <button onClick={onClose} style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="#4B5563" strokeWidth="1.8" strokeLinecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: "20px 26px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+          <DeployOption icon="🧪" label="Test on a slice" volume="5% of live traffic"
+            sub="Validate on a small cohort before going wider. Auto-promote on green metrics or roll back if it regresses."
+            selected={choice === "test"} onSelect={() => setChoice("test")} />
+          <DeployOption icon="⚖️" label="A/B test" volume="50% / 50% split"
+            sub="Run old and new versions head-to-head. We'll measure automation rate, success rate, and CSAT to statistical significance."
+            selected={choice === "ab"} onSelect={() => setChoice("ab")} />
+          <DeployOption icon="🚀" label="Full rollout" volume="100% of traffic"
+            sub="Ship the new version to all eligible tickets immediately. Use when you're confident in the change."
+            selected={choice === "full"} onSelect={() => setChoice("full")} />
+          <div onClick={() => setChoice("custom")} style={{
+            padding: "14px 16px", borderRadius: 12,
+            border: `1.5px solid ${choice === "custom" ? tokens.accent : tokens.border}`,
+            background: choice === "custom" ? "#FAFAF9" : tokens.bgWhite,
+            cursor: "pointer", display: "flex", flexDirection: "column", gap: 12,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 16 }}>🎚</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>Custom rollout</div>
+                <div style={{ fontSize: 12.5, color: tokens.textSecondary }}>Pick the exact share of traffic.</div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>{custom}%</div>
+            </div>
+            <input type="range" min="1" max="100" value={custom}
+              onChange={e => setCustom(parseInt(e.target.value))}
+              onClick={e => e.stopPropagation()}
+              style={{ width: "100%", accentColor: tokens.accent, cursor: "pointer" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: tokens.textMuted }}>
+              <span>1%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+            </div>
+          </div>
+        </div>
+        <div style={{
+          padding: "16px 26px", borderTop: `1px solid ${tokens.border}`,
+          background: "#FAFAF9",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+        }}>
+          <div style={{ fontSize: 12.5, color: tokens.textSecondary }}>
+            Deploying to <strong style={{ color: tokens.text, fontWeight: 600 }}>{summary.volume}</strong> · {summary.label}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <ButtonSecondary onClick={onClose}>Cancel</ButtonSecondary>
+            <ButtonDark onClick={() => onDeploy(summary)}>Deploy →</ButtonDark>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function DeployOption({ icon, label, volume, sub, selected, onSelect }) {
+  return (
+    <div onClick={onSelect} style={{
+      padding: "14px 16px", borderRadius: 12,
+      border: `1.5px solid ${selected ? tokens.accent : tokens.border}`,
+      background: selected ? "#FAFAF9" : tokens.bgWhite,
+      cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 12,
+    }}>
+      <div style={{
+        width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+        border: `1.5px solid ${selected ? tokens.accent : "#D1D5DB"}`,
+        background: selected ? tokens.accent : "#fff",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {selected && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+          <span style={{ fontSize: 16 }}>{icon}</span>
+          <span style={{ fontSize: 14.5, fontWeight: 600, color: tokens.text }}>{label}</span>
+          <span style={{
+            fontSize: 11.5, fontWeight: 500,
+            padding: "2px 8px", borderRadius: 999,
+            background: selected ? tokens.purpleLight : tokens.grayLight,
+            color: selected ? "#5B21B6" : tokens.textSecondary,
+          }}>{volume}</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: tokens.textSecondary, lineHeight: 1.55 }}>{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN
+// ════════════════════════════════════════════════════════════════
+export default function InAppTestingPrototype() {
+  // Default state: test view, draft pending, eval already complete
+  const [view, setView] = useState("test");
+  const [dirty, setDirty] = useState(true);
+  const [showDeploy, setShowDeploy] = useState(false);
+  const [deployed, setDeployed] = useState(null);
+  const [evalState, setEvalState] = useState("complete"); // "running" | "complete"
+  const [evalKey, setEvalKey] = useState(0);
+
+  const blocks = useMemo(() => {
+    if (!dirty) return INITIAL_INSTRUCTIONS;
+    const out = [];
+    INITIAL_INSTRUCTIONS.forEach((b, i) => {
+      if (i === 2) out.push({ ...b, text: b.text + " and" });
+      else out.push(b);
+    });
+    return out;
+  }, [dirty]);
+
+  const status = dirty ? "Draft" : "Enabled";
+
+  const rerunEval = useCallback(() => {
+    setEvalState("running");
+    setEvalKey(k => k + 1);
+    setTimeout(() => setEvalState("complete"), 1500);
+  }, []);
+
+  return (
+    <>
+      <style>{`
+        @keyframes gorgiasTypingPulse {
+          0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+          40% { opacity: 1; transform: translateY(-2px); }
+        }
+      `}</style>
+      <div style={css.page}>
+        <IconRail activeId="ai-agent" />
+        {view === "edit" && <NavPanel />}
+
+        <div style={css.contentContainer}>
+          {/* Header */}
+          <div style={{
+            padding: "12px 22px",
+            borderBottom: `1px solid ${tokens.border}`,
+            background: tokens.bgWhite,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 16, flexShrink: 0,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              {view === "edit" && (
+                <button style={iconBtn(28)}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="#4B5563" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              )}
+              <span style={{ fontSize: 16, fontWeight: 700, color: tokens.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                Product edits in an order (replace product, remove product)
+              </span>
+              {dirty && <StatusPill status="Draft" />}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+              {view === "edit" && (
+                <>
+                  <button style={iconBtn(30)}>
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9" stroke="#EF4444" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <button style={iconBtn(30)}>
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#4B5563" strokeWidth="1.4"/><path d="M8 5v3l2 1" stroke="#4B5563" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                  </button>
+                </>
+              )}
+              {dirty ? (
+                <ButtonDark onClick={() => setShowDeploy(true)}>
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M8 2l-3 3M8 2l3 3M2 12v2h12v-2" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Publish changes
+                </ButtonDark>
+              ) : (
+                <ButtonSecondary>Disable</ButtonSecondary>
+              )}
+              {view === "edit" ? (
+                <ButtonSecondary onClick={() => setView("test")}>
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><path d="M6 5l5 3-5 3V5z" fill="currentColor"/></svg>
+                  Test
+                </ButtonSecondary>
+              ) : (
+                <ButtonSecondary onClick={() => setView("edit")}>
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="#4B5563" strokeWidth="1.7" strokeLinecap="round"/></svg>
+                  Exit test
+                </ButtonSecondary>
+              )}
+            </div>
+          </div>
+
+          {/* Deployed banner */}
+          {deployed && (
+            <div style={{
+              padding: "10px 22px", background: "#F0FDF4",
+              borderBottom: "1px solid #BBF7D0",
+              display: "flex", alignItems: "center", gap: 10,
+              fontSize: 13, color: "#166534",
+            }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>
+              </div>
+              <span><strong style={{ fontWeight: 600 }}>Deployed to {deployed.volume}</strong> · {deployed.label}. Adjust the rollout anytime from <a style={{ color: "#166534", textDecoration: "underline", cursor: "pointer" }}>Deploy → Skills</a>.</span>
+              <button onClick={() => setDeployed(null)} style={{ marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer", color: "#166534", fontSize: 18, lineHeight: 1 }}>×</button>
+            </div>
+          )}
+
+          {/* Body */}
+          {view === "edit" ? (
+            <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+              <div style={{
+                flex: 1, minWidth: 0,
+                padding: "26px 32px 40px",
+                overflowY: "auto", background: tokens.bgWhite,
+              }}>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text, display: "flex", alignItems: "center", gap: 4 }}>
+                    Instructions <span style={{ color: tokens.red }}>*</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: tokens.textSecondary, marginTop: 2, lineHeight: 1.5 }}>
+                    Step-by-step instructions for how AI Agent should handle conversations tied to this skill's intents.
+                  </div>
+                </div>
+                <div onClick={() => setDirty(true)} style={{ cursor: dirty ? "default" : "text" }}>
+                  <InstructionsBlock blocks={blocks} />
+                </div>
+              </div>
+              <InfoPanel status={status} />
+            </div>
+          ) : (
+            <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+              {/* Instructions (left — takes remaining space) */}
+              <div style={{
+                flex: 1, minWidth: 0,
+                padding: "20px 28px 32px",
+                overflowY: "auto",
+                background: tokens.bgWhite,
+                borderRight: `1px solid ${tokens.border}`,
+              }}>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>Instructions</div>
+                  <div style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 2 }}>
+                    Editing draft · edits re-run the eval.
+                  </div>
+                </div>
+                <InstructionsBlock blocks={blocks} compact />
+              </div>
+
+              {/* Conversation (center) */}
+              <ConvoPreview onReset={() => {}} />
+
+              {/* Eval sidebar (right) */}
+              <EvalSidebar
+                key={evalKey}
+                running={evalState === "running"}
+                complete={evalState === "complete"}
+                onRerun={rerunEval}
+              />
+            </div>
+          )}
+        </div>
+
+        <DeployModal
+          open={showDeploy}
+          onClose={() => setShowDeploy(false)}
+          onDeploy={(summary) => {
+            setShowDeploy(false);
+            setDeployed(summary);
+            setDirty(false);
+            setView("edit");
+          }}
+        />
+      </div>
+    </>
+  );
+}
+
+function iconBtn(size = 30) {
+  return {
+    width: size, height: size, borderRadius: 7,
+    background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+  };
+}
