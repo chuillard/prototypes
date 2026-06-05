@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Knowledge — Gorgias Prototype v4</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{height:100%}
+    body{font-family:Inter,-apple-system,sans-serif;background:#F7F6F3}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#E0DDDA;border-radius:4px}
+  </style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+const T = {
+  purple:"#7C3AED", purpleLight:"#EDE9FE", purpleDark:"#3730A3", purpleMid:"#A78BFA",
+  green:"#059669", greenLight:"#D1FAE5", greenMid:"#A7F3D0",
+  blue:"#2563EB", blueLight:"#DBEAFE",
+  red:"#EF4444",
+  text:"#111827", textSec:"#6B7280", textMuted:"#9CA3AF",
+  border:"#E8E6DF", bg:"#F7F6F3", white:"#FFFFFF", gray:"#F3F2EE",
+  railBg:"#F0EEF8", railActive:"#EDE9FE", railActiveText:"#6D28D9",
+};
+
+// ── small helpers ──────────────────────────────────────────────
+const CalSvg = ({c="#9CA3AF",s=13}) => (
+  <svg width={s} height={s} viewBox="0 0 16 16" fill="none">
+    <rect x="1" y="2.5" width="14" height="12" rx="2" stroke={c} strokeWidth="1.3"/>
+    <path d="M1 6.5h14M5 1v3M11 1v3" stroke={c} strokeWidth="1.3" strokeLinecap="round"/>
+  </svg>
+);
+
+const ChevSvg = ({open}) => (
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"
+    style={{transition:"transform .2s", transform:open?"none":"rotate(180deg)", flexShrink:0}}>
+    <path d="M4 10l4-4 4 4" stroke="#9CA3AF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const TypeIcon = ({type, c="#6B7280"}) =>
+  type === "help-center"
+    ? <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5" stroke={c} strokeWidth="1.3"/><path d="M5 5h6M5 8h6M5 11h4" stroke={c} strokeWidth="1.3" strokeLinecap="round"/></svg>
+    : <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4h4l-3 2.5 1.5 4L8 9l-4 2.5 1.5-4L2.5 5h4L8 1z" fill={c}/></svg>;
+
+const Toggle = ({on, onToggle}) => (
+  <div onClick={onToggle} style={{width:28,height:16,borderRadius:8,cursor:"pointer",
+    background:on?T.purple:"#D1D5DB",position:"relative",transition:"background .2s",flexShrink:0}}>
+    <div style={{position:"absolute",top:2,left:on?14:2,width:12,height:12,
+      borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/>
+  </div>
+);
+
+function daysBetween(a, b) {
+  try {
+    const m = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const p = s => { const [mo,d,y] = s.trim().split(/[\s,]+/); return new Date(+y, m[mo], +d); };
+    const n = Math.round((p(b)-p(a))/(864e5));
+    return n > 0 ? n : null;
+  } catch { return null; }
+}
+
+// ── knowledge data with real content ──────────────────────────
+const ITEMS = [
+  { id:1, title:"Can I change or cancel my order?", type:"guidance",
+    tickets:47, handover:5, csat:4.8, created:"Mar 12, 2026", updated:"Apr 17, 2026",
+    helpCenter:null, source:"manual", schedule:null,
+    content:`When a customer contacts us to change or cancel their order:
+
+• Changes are only possible within 1 hour of the order being placed.
+• After 1 hour, if the order is in "Processing" or "Shipped" status, changes cannot be made.
+• For cancellation requests on shipped orders, direct the customer to our returns flow.
+• Always use the order lookup tool to check status before responding.
+• Confirm the final outcome by email and acknowledge any inconvenience.
+
+**If the order has not yet been dispatched**, log the modification in the order management system and confirm with the customer within 15 minutes.` },
+
+  { id:2, title:"Where is my order?", type:"help-center",
+    tickets:156, handover:11, csat:4.7, created:"Mar 10, 2026", updated:"Apr 17, 2026",
+    helpCenter:"NouriVida Help Center", source:"manual", schedule:null,
+    content:`Once your NouriVida order has been dispatched, you will receive a shipping confirmation email with a tracking number within 24 hours.
+
+**To track your order:**
+
+1. Click the tracking link in your shipping confirmation email
+2. Visit our Track Order page and enter your order number
+3. Contact our support team if no tracking email has arrived after 3 business days
+
+Typical delivery times:
+• Standard: 3–5 business days
+• Express: 1–2 business days
+• International: 7–14 business days` },
+
+  { id:3, title:"How long does shipping take?", type:"guidance",
+    tickets:94, handover:6, csat:4.6, created:"Mar 10, 2026", updated:"Apr 17, 2026",
+    helpCenter:null, source:"manual", schedule:null,
+    content:`When a customer asks about shipping times, share the following:
+
+Standard delivery: 3–5 business days from dispatch
+Express delivery: 1–2 business days from dispatch
+International orders: 7–14 business days
+
+Orders are dispatched within 24 hours of being placed (Monday–Friday). Orders placed after 2pm Friday are dispatched the following Monday.
+
+**During peak periods (Black Friday, Christmas):** add a note that times may be extended and point to our shipping updates page.` },
+
+  { id:4, title:"What is your return policy?", type:"help-center",
+    tickets:44, handover:3, csat:4.5, created:"Mar 10, 2026", updated:"Apr 17, 2026",
+    helpCenter:"NouriVida Help Center", source:"manual", schedule:null,
+    content:`We offer a 30-day return policy on all NouriVida products.
+
+**What qualifies for a return:**
+• Unopened products in their original packaging
+• Defective or damaged items (photo required)
+• Incorrect items received
+
+**What does not qualify:**
+• Opened or partially used products (hygiene policy)
+• Items purchased more than 30 days ago
+
+To start a return, visit our Returns page or contact our support team with your order number.` },
+
+  { id:5, title:"My order arrived damaged", type:"guidance",
+    tickets:19, handover:8, csat:4.2, created:"Mar 12, 2026", updated:"Apr 17, 2026",
+    helpCenter:null, source:"manual", schedule:null,
+    content:`When a customer reports a damaged order:
+
+1. Express empathy immediately — do not ask for proof before acknowledging the issue.
+2. Ask for photos of the damaged item and the packaging.
+3. Offer a full replacement or a full refund, the customer's choice.
+4. For minor cosmetic damage (packaging dent, small scratch), also offer a partial refund as an alternative option.
+5. Log the damage report in the quality tracking system with batch number if visible.
+
+Do not ask customers to return damaged items unless instructed by the warehouse team.` },
+
+  { id:6, title:"Are your products suitable for vegans?", type:"help-center",
+    tickets:8, handover:0, csat:null, created:"Apr 17, 2026", updated:"Apr 17, 2026",
+    helpCenter:"NouriVida Help Center", source:"manual", schedule:null,
+    content:`All NouriVida products are 100% suitable for vegans.
+
+We do not use any animal-derived ingredients in our formulations, and our manufacturing process does not involve animal testing.
+
+**Certifications:**
+• Certified Vegan — Vegan Society
+• Cruelty-Free — Leaping Bunny certified
+
+Our packaging is produced using recycled materials and is fully recyclable. If you have specific allergy or dietary questions, our nutrition team is available at nutrition@nourivida.com.` },
+
+  { id:7, title:"Holiday shipping — allow 7–10 business days", type:"guidance",
+    tickets:0, handover:0, csat:null, created:"Jun 5, 2026", updated:"Jun 5, 2026",
+    helpCenter:null, source:"manual",
+    schedule:{from:"Nov 25, 2026", fromTime:"9:00 AM", until:"Jan 15, 2027", untilTime:"11:59 PM", tz:"GMT+1 Europe/London"},
+    content:`Due to the high volume of orders during the holiday season, please let customers know that delivery times are extended.
+
+When responding to "where is my order?" tickets during this period:
+
+• Advise that standard delivery is currently 7–10 business days.
+• Reassure the customer that their order has been placed and will arrive safely.
+• Do not promise a specific date unless tracking shows it.
+• If the order is more than 12 business days old with no movement, escalate to the warehouse team.
+
+This guidance is active from Nov 25 through Jan 15 only. Outside this window, use the standard shipping guidance.` },
+
+  { id:8, title:"BFCM — expect 5–7 extra days for delivery", type:"guidance",
+    tickets:0, handover:0, csat:null, created:"Jun 5, 2026", updated:"Jun 5, 2026",
+    helpCenter:null, source:"copilot",
+    schedule:{from:"Nov 25, 2026", fromTime:"12:00 AM", until:"Dec 5, 2026", untilTime:"11:59 PM", tz:"GMT+1 Europe/London"},
+    content:`Due to exceptionally high order volume during Black Friday / Cyber Monday, delivery times are extended.
+
+**Updated estimated delivery:**
+• Standard: 8–12 business days
+• Express: 3–5 business days
+
+When a customer asks about their BFCM order:
+• Acknowledge the delay proactively — do not wait for them to ask.
+• Confirm their order is in the queue and will be dispatched in order of purchase date.
+• Offer to send a tracking notification as soon as dispatch occurs.
+
+This notice applies to orders placed Nov 25–Dec 1. Do not use this guidance for orders placed after Dec 2.` },
+
+  { id:9, title:"Pro Shaker lid — warranty replacement policy", type:"guidance",
+    tickets:0, handover:0, csat:null, created:"Jun 5, 2026", updated:"Jun 5, 2026",
+    helpCenter:null, source:"copilot",
+    schedule:{from:"Jun 5, 2026", fromTime:"Now", until:"Jun 12, 2026", untilTime:"11:59 PM", tz:"GMT+1 Europe/London"},
+    content:`We are aware of a lid sealing issue affecting some Pro Shaker bottles (batch #2024-11).
+
+When a customer contacts us about a Pro Shaker lid that does not seal correctly:
+
+1. Apologise and acknowledge the issue.
+2. Ask for their order number and a photo of the affected lid.
+3. Arrange a free replacement lid — no return of the bottle required.
+4. Replacements are dispatched within 2–3 business days.
+5. Log the contact in the quality tracking system with the batch number.
+
+This issue does not affect the safety of the product. The guidance is active for 1 week while we process replacement requests.` },
+
+  { id:10, title:"Extended EU delivery — warehouse operational issue", type:"guidance",
+    tickets:0, handover:0, csat:null, created:"Jun 4, 2026", updated:"Jun 5, 2026",
+    helpCenter:null, source:"manual",
+    schedule:{from:"Jun 4, 2026", fromTime:"9:00 AM", until:null, untilTime:null, tz:"GMT+1 Europe/London"},
+    content:`Due to an operational issue at our EU fulfilment centre, orders are currently taking 5–8 additional business days.
+
+When responding to EU delivery enquiries:
+
+• Confirm that the customer's order has been received and payment processed.
+• Advise that dispatch is delayed but the order will be fulfilled.
+• Do not commit to a specific dispatch date.
+• Offer to send a proactive notification when the order ships.
+
+This guidance remains active until the warehouse resolves the issue. Watch for an update from the operations team before removing it.` },
+];
+
+// ── content renderer ───────────────────────────────────────────
+function ContentRenderer({ text }) {
+  const lines = text.split('\n');
+  return (
+    <div style={{fontSize:14, color:T.text, lineHeight:1.75}}>
+      {lines.map((line, i) => {
+        if (line === '') return <div key={i} style={{height:6}}/>;
+        if (line.startsWith('**') && line.endsWith('**') && line.length > 4)
+          return <p key={i} style={{fontWeight:600, color:T.text, margin:"14px 0 6px"}}>{line.slice(2,-2)}</p>;
+        if (line.startsWith('• '))
+          return (
+            <div key={i} style={{display:"flex", gap:10, marginBottom:5, paddingLeft:4}}>
+              <span style={{color:T.purple, fontWeight:700, marginTop:1, flexShrink:0}}>•</span>
+              <span style={{color:"#374151"}}>{parseBold(line.slice(2))}</span>
+            </div>
+          );
+        if (/^\d+\.\s/.test(line)) {
+          const m = line.match(/^(\d+)\.\s*(.*)/);
+          return (
+            <div key={i} style={{display:"flex", gap:10, marginBottom:5, paddingLeft:4}}>
+              <span style={{color:T.purple, fontWeight:600, minWidth:16, flexShrink:0}}>{m[1]}.</span>
+              <span style={{color:"#374151"}}>{parseBold(m[2])}</span>
+            </div>
+          );
+        }
+        return <p key={i} style={{marginBottom:4, color:"#374151"}}>{parseBold(line)}</p>;
+      })}
+    </div>
+  );
+}
+
+function parseBold(text) {
+  const parts = text.split(/\*\*(.*?)\*\*/);
+  return parts.map((p, i) => i % 2 === 1 ? <strong key={i} style={{color:T.text}}>{p}</strong> : p);
+}
+
+// ── schedule modal ─────────────────────────────────────────────
+function ScheduleModal({ item, onClose, onSave }) {
+  const s = item?.schedule;
+  const [fromDate, setFrom]  = useState(s?.from     || "");
+  const [fromTime, setFTime] = useState(s?.fromTime || "9:00 AM");
+  const [hasEnd,   setHasEnd]= useState(!!s?.until);
+  const [untilDate,setUntil] = useState(s?.until    || "");
+  const [untilTime,setUTime] = useState(s?.untilTime|| "11:59 PM");
+  const [tz, setTz]          = useState(s?.tz       || "GMT+1 Europe/London");
+  const times = ["12:00 AM","6:00 AM","8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","3:00 PM","6:00 PM","9:00 PM","11:00 PM","11:59 PM"];
+  const tzs   = ["GMT-8 America/Los_Angeles","GMT-5 America/New_York","GMT+0 UTC","GMT+1 Europe/London","GMT+2 Europe/Paris"];
+  const days  = hasEnd && fromDate && untilDate ? daysBetween(fromDate, untilDate) : null;
+  const iStyle = {padding:"9px 10px 9px 32px",border:`1.5px solid ${T.border}`,borderRadius:8,fontSize:13,color:T.text,outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"Inter,sans-serif",transition:"border-color .15s"};
+  const sStyle = {padding:"9px 12px",border:`1.5px solid ${T.border}`,borderRadius:8,fontSize:13,color:T.text,background:"#fff",outline:"none",cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0};
+  return (
+    <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.22)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:480,background:"#fff",borderRadius:16,boxShadow:"0 24px 60px rgba(0,0,0,.16)",border:`1px solid ${T.border}`,overflow:"hidden",fontFamily:"Inter,sans-serif"}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"20px 24px 16px",borderBottom:`1px solid ${T.border}`}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:T.text,marginBottom:3}}>Schedule availability</div>
+            <div style={{fontSize:13,color:T.textSec}}>This item will only be used by AI Agent during the active window.</div>
+          </div>
+          <button onClick={onClose} style={{width:30,height:30,borderRadius:7,border:`1px solid ${T.border}`,background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:18}}>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:T.purple}}/>Active from
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{position:"relative",flex:1}}>
+                <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}><CalSvg c={T.textMuted}/></span>
+                <input value={fromDate} onChange={e=>setFrom(e.target.value)} placeholder="e.g. Nov 25, 2026" style={iStyle}
+                  onFocus={e=>e.target.style.borderColor=T.purple} onBlur={e=>e.target.style.borderColor=T.border}/>
+              </div>
+              <select value={fromTime} onChange={e=>setFTime(e.target.value)} style={sStyle}>{times.map(t=><option key={t}>{t}</option>)}</select>
+            </div>
+            <select value={tz} onChange={e=>setTz(e.target.value)} style={{...sStyle,width:"100%",marginTop:8,fontSize:12,color:T.textSec,background:T.gray,border:`1px solid ${T.border}`}}>
+              {tzs.map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+          {days && (
+            <div style={{display:"flex",alignItems:"center",gap:12,padding:"0 8px"}}>
+              <div style={{flex:1,height:1,background:"#E0DAFB"}}/>
+              <div style={{fontSize:12,color:T.purple,fontWeight:600,background:T.purpleLight,padding:"3px 12px",borderRadius:20}}>{days} days</div>
+              <div style={{flex:1,height:1,background:"#E0DAFB"}}/>
+            </div>
+          )}
+          <div onClick={e=>{if(e.target.tagName!=="SELECT")setHasEnd(!hasEnd)}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:hasEnd?T.purpleLight:T.gray,borderRadius:10,cursor:"pointer",border:`1px solid ${hasEnd?"#DDD6FE":T.border}`,transition:"all .15s"}}>
+            <Toggle on={hasEnd} onToggle={()=>setHasEnd(!hasEnd)}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:500,color:T.text}}>Set an end time</div>
+              <div style={{fontSize:11,color:T.textMuted,marginTop:1}}>AI Agent stops using this item automatically.</div>
+            </div>
+          </div>
+          {hasEnd && (
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:"#fff",border:`2px solid ${T.purple}`,boxShadow:`0 0 0 1px ${T.purple}`}}/>Active until
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <div style={{position:"relative",flex:1}}>
+                  <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}><CalSvg c={T.textMuted}/></span>
+                  <input value={untilDate} onChange={e=>setUntil(e.target.value)} placeholder="e.g. Jan 15, 2027" style={iStyle}
+                    onFocus={e=>e.target.style.borderColor=T.purple} onBlur={e=>e.target.style.borderColor=T.border}/>
+                </div>
+                <select value={untilTime} onChange={e=>setUTime(e.target.value)} style={sStyle}>{times.map(t=><option key={t}>{t}</option>)}</select>
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{padding:"14px 24px",borderTop:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <span style={{fontSize:12,color:T.textMuted}}>
+            {fromDate&&!hasEnd?"No end — always active from this date":""}
+            {fromDate&&hasEnd&&untilDate&&days?`Active for ${days} days`:""}
+          </span>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onClose} style={{padding:"8px 18px",borderRadius:8,border:`1px solid ${T.border}`,background:"#fff",fontSize:13,fontWeight:500,color:T.text,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Cancel</button>
+            <button onClick={()=>onSave({from:fromDate,fromTime,until:hasEnd?untilDate:null,untilTime:hasEnd?untilTime:null,tz})} style={{padding:"8px 18px",borderRadius:8,background:T.purple,color:"#fff",border:"none",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Save schedule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── scheduling section ─────────────────────────────────────────
+function SchedulingSection({ item, onEdit, onRemove }) {
+  const s = item.schedule;
+  const days = s?.from && s?.until ? daysBetween(s.from, s.until) : null;
+  if (!s) return (
+    <div style={{padding:"6px 16px 16px"}}>
+      <div style={{fontSize:12,color:T.textMuted,marginBottom:12,lineHeight:1.5}}>
+        Always active. Add a window to control exactly when AI Agent uses it.
+      </div>
+      <button onClick={onEdit}
+        style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"10px 14px",borderRadius:9,border:`1.5px dashed ${T.border}`,background:T.gray,fontSize:13,fontWeight:500,color:T.textSec,cursor:"pointer",width:"100%",boxSizing:"border-box",fontFamily:"Inter,sans-serif",transition:"all .15s"}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=T.purpleMid;e.currentTarget.style.color=T.purple;e.currentTarget.style.background=T.purpleLight;}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.textSec;e.currentTarget.style.background=T.gray;}}>
+        <CalSvg c={T.textSec} s={14}/>
+        Add activation window
+      </button>
+    </div>
+  );
+  return (
+    <div style={{padding:"6px 16px 16px",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{background:"#F5F3FF",borderRadius:11,padding:"14px",border:"1px solid #DDD6FE",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",right:-16,top:-16,width:64,height:64,borderRadius:"50%",background:"rgba(124,58,237,.06)"}}/>
+        {/* from */}
+        <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:s.until?6:0}}>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:3}}>
+            <div style={{width:10,height:10,borderRadius:"50%",background:T.purple,flexShrink:0}}/>
+            {s.until&&<div style={{width:1.5,height:28,background:"linear-gradient(#7C3AED,#C4B5FD)",marginTop:2}}/>}
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:10,fontWeight:700,color:T.purple,textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>Active from</div>
+            <div style={{fontSize:13,fontWeight:600,color:T.purpleDark}}>{s.from}</div>
+            <div style={{fontSize:11,color:T.purpleMid,marginTop:1}}>{s.fromTime}</div>
+          </div>
+          {days&&<div style={{fontSize:11,fontWeight:600,color:T.purple,background:"rgba(255,255,255,.8)",padding:"3px 9px",borderRadius:10,alignSelf:"center"}}>{days}d</div>}
+        </div>
+        {/* until */}
+        {s.until ? (
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{paddingTop:3}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:"#fff",border:`2px solid ${T.purple}`,flexShrink:0}}/>
+            </div>
+            <div>
+              <div style={{fontSize:10,fontWeight:700,color:T.purple,textTransform:"uppercase",letterSpacing:".05em",marginBottom:2}}>Active until</div>
+              <div style={{fontSize:13,fontWeight:600,color:T.purpleDark}}>{s.until}</div>
+              <div style={{fontSize:11,color:T.purpleMid,marginTop:1}}>{s.untilTime}</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{paddingLeft:20,marginTop:4}}>
+            <span style={{fontSize:11,color:T.purpleMid,fontStyle:"italic"}}>No end — always active from this date</span>
+          </div>
+        )}
+        <div style={{display:"flex",alignItems:"center",gap:5,marginTop:10,paddingTop:8,borderTop:"1px solid rgba(167,139,250,.3)"}}>
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="#A78BFA" strokeWidth="1.3"/><path d="M8 5v3l2 1" stroke="#A78BFA" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          <span style={{fontSize:11,color:T.purpleMid}}>{s.tz}</span>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:7}}>
+        <button onClick={onEdit} style={{flex:1,padding:"7px",borderRadius:8,border:`1px solid ${T.border}`,background:"#fff",fontSize:12,fontWeight:500,color:T.text,cursor:"pointer",fontFamily:"Inter,sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=T.purpleMid} onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5L13.5 4.5 5 13H3v-2L11.5 2.5z" stroke="#6B7280" strokeWidth="1.4" strokeLinejoin="round"/></svg>
+          Edit window
+        </button>
+        <button onClick={onRemove} style={{padding:"7px 12px",borderRadius:8,border:"1px solid #FCA5A5",background:"#FFF5F5",fontSize:12,fontWeight:500,color:T.red,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Remove</button>
+      </div>
+    </div>
+  );
+}
+
+// ── right-side detail panel ────────────────────────────────────
+function SidePanel({ item, onEditSchedule, onRemoveSchedule }) {
+  const [inUse,       setInUse]       = useState(true);
+  const [detOpen,     setDetOpen]     = useState(true);
+  const [schedOpen,   setSchedOpen]   = useState(true);
+  const [impactOpen,  setImpactOpen]  = useState(true);
+  const [ticketsOpen, setTicketsOpen] = useState(true);
+  const [engageOpen,  setEngageOpen]  = useState(false);
+
+  const SH = ({ label, open, toggle, extra }) => (
+    <div onClick={toggle} style={{display:"flex",alignItems:"center",gap:6,padding:"11px 16px",cursor:"pointer",userSelect:"none",borderBottom:`1px solid ${T.gray}`}}>
+      <span style={{fontSize:13,fontWeight:600,color:T.text,flex:1}}>{label}</span>
+      {extra}
+      <ChevSvg open={open}/>
+    </div>
+  );
+  const Row = ({ l, v }) => (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:`1px solid ${T.gray}`}}>
+      <span style={{fontSize:12,color:T.textSec}}>{l}</span>
+      <span style={{fontSize:12,color:T.text}}>{v}</span>
+    </div>
+  );
+
+  return (
+    <div style={{width:296,flexShrink:0,borderLeft:`1px solid ${T.border}`,overflowY:"auto",background:"#fff"}}>
+
+      {/* Details */}
+      <div style={{borderBottom:`1px solid ${T.border}`}}>
+        <SH label="Details" open={detOpen} toggle={()=>setDetOpen(!detOpen)}/>
+        {detOpen && (
+          <div style={{padding:"6px 16px 12px",display:"flex",flexDirection:"column",gap:2}}>
+            <Row l="Type" v={
+              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                <TypeIcon type={item.type}/>
+                <span style={{fontSize:12}}>{item.type==="help-center"?"Help Center article":"Guidance"}</span>
+              </div>
+            }/>
+            <Row l="Status" v={<span style={{fontSize:11,padding:"2px 9px",borderRadius:20,fontWeight:500,background:T.greenLight,color:T.green,border:`1px solid ${T.greenMid}`}}>Published</span>}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:`1px solid ${T.gray}`}}>
+              <span style={{fontSize:12,color:T.textSec}}>In use by AI Agent</span>
+              <Toggle on={inUse} onToggle={()=>setInUse(!inUse)}/>
+            </div>
+            <Row l="Created" v={item.created}/>
+            <Row l="Last updated" v={item.updated}/>
+            {item.helpCenter && <Row l="Help Center" v={<span style={{color:T.purple,cursor:"pointer",fontSize:12}}>{item.helpCenter}</span>}/>}
+            {item.source==="copilot" && <Row l="Origin" v={
+              <span style={{fontSize:11,padding:"2px 7px",borderRadius:10,background:T.blueLight,color:T.blue,fontWeight:600,display:"inline-flex",alignItems:"center",gap:3}}>
+                🤖 Copilot
+              </span>
+            }/>}
+          </div>
+        )}
+      </div>
+
+      {/* Scheduling */}
+      <div style={{borderBottom:`1px solid ${T.border}`,background:item.schedule?"#FEFCFF":"#fff"}}>
+        <SH label="Scheduling" open={schedOpen} toggle={()=>setSchedOpen(!schedOpen)}
+          extra={item.schedule&&<CalSvg c={T.purple} s={13}/>}/>
+        {schedOpen && (
+          <SchedulingSection item={item} onEdit={onEditSchedule} onRemove={onRemoveSchedule}/>
+        )}
+      </div>
+
+      {/* Impact */}
+      <div style={{borderBottom:`1px solid ${T.border}`}}>
+        <SH label="Impact" open={impactOpen} toggle={()=>setImpactOpen(!impactOpen)}
+          extra={<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="#9CA3AF" strokeWidth="1.3"/><path d="M8 7.5V11M8 5.5v.5" stroke="#9CA3AF" strokeWidth="1.3" strokeLinecap="round"/></svg>}/>
+        {impactOpen && (
+          <div style={{padding:"6px 16px 12px"}}>
+            <div style={{fontSize:11,color:T.textMuted,marginBottom:8}}>Last 28 days</div>
+            {[
+              {l:"Tickets",        v:item.tickets ||"—"},
+              {l:"Handover tickets",v:item.handover||"—"},
+              {l:"CSAT",           v:item.csat?item.csat+" ★":"—"},
+              {l:"Intents",        v:item.tickets?Math.round(item.tickets*.28):"—"},
+            ].map(({l,v})=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${T.gray}`}}>
+                <span style={{fontSize:12,color:T.textSec}}>{l}</span>
+                <span style={{fontSize:12,color:v==="—"?T.textMuted:T.text,fontWeight:v==="—"?400:500}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recent tickets */}
+      <div style={{borderBottom:`1px solid ${T.border}`}}>
+        <SH label="Recent tickets" open={ticketsOpen} toggle={()=>setTicketsOpen(!ticketsOpen)}
+          extra={<span style={{fontSize:11,fontWeight:600,padding:"1px 6px",borderRadius:10,background:T.gray,color:T.textSec}}>{item.tickets||0}</span>}/>
+        {ticketsOpen && (
+          <div style={{padding:"6px 16px 12px"}}>
+            <div style={{fontSize:11,color:T.textMuted,marginBottom:8}}>Last 28 days</div>
+            {item.tickets===0
+              ? <div style={{fontSize:12,color:T.textMuted,textAlign:"center",padding:"10px 0"}}>This knowledge item has not been used by AI Agent yet</div>
+              : [1,2].map(i=>(
+                <div key={i} style={{padding:"7px 10px",borderRadius:8,border:`1px solid ${T.border}`,fontSize:12,color:T.textSec,marginBottom:5,cursor:"pointer"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.gray} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                  #{10200+i*41} · Customer inquiry · <span style={{color:T.green}}>Resolved</span>
+                </div>
+              ))
+            }
+          </div>
+        )}
+      </div>
+
+      {/* Engagement */}
+      <div>
+        <SH label="Engagement" open={engageOpen} toggle={()=>setEngageOpen(!engageOpen)}/>
+        {engageOpen && (
+          <div style={{padding:"6px 16px 12px"}}>
+            <div style={{fontSize:11,color:T.textMuted,marginBottom:8}}>Last 28 days</div>
+            {[{l:"Views",v:item.tickets?item.tickets*4:"—"},{l:"Rating",v:"—"}].map(({l,v})=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${T.gray}`}}>
+                <span style={{fontSize:12,color:T.textSec}}>{l}</span>
+                <span style={{fontSize:12,color:v==="—"?T.textMuted:T.text}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── nav panel ──────────────────────────────────────────────────
+function NavPanel() {
+  return (
+    <div style={{width:210,background:T.white,display:"flex",flexDirection:"column",borderRight:`1px solid ${T.border}`,flexShrink:0,overflowY:"auto"}}>
+      <div style={{padding:"13px 15px 10px",borderBottom:`1px solid ${T.border}`}}>
+        <span style={{fontSize:16,fontWeight:700,color:T.text,letterSpacing:"-.02em"}}>AI Agent</span>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 15px",borderBottom:`1px solid ${T.border}`}}>
+        <svg width="22" height="22" viewBox="0 0 44 44" fill="none"><rect width="44" height="44" rx="8" fill="#96BF48"/><path d="M30 15s-.1-.8-.6-1.3c-.5-.5-1.2-.8-1.2-.8l-.3-2c-.3-1.3-1.5-2-2.8-1.8l-.4.1C24 8.4 23 8 22 8c-2 0-3 1.5-3.3 2.9l-3.4.7c-.5.1-.9.6-.9 1.1l-.4 14 11.8 2 4-1.2L30 15z" fill="white"/></svg>
+        <span style={{fontSize:13,fontWeight:500,color:T.text}}>nourivida</span>
+        <div style={{marginLeft:"auto",width:8,height:8,borderRadius:"50%",background:"#22C55E"}}/>
+      </div>
+      <div style={{padding:"6px 6px",flex:1}}>
+        {[["Analyze",[{l:"Overview"},{l:"Intents"},{l:"Opportunities",badge:"Beta",count:3}]],
+          ["Train",  [{l:"Skills",badge:"New"},{l:"Knowledge",active:true},{l:"Tone of Voice"},{l:"Support Actions"},{l:"Products"}]]
+        ].map(([sec,items])=>(
+          <div key={sec}>
+            <div style={{fontSize:12,fontWeight:600,color:T.textSec,padding:"7px 8px 3px"}}>{sec}</div>
+            {items.map(({l,active,badge,count})=>(
+              <div key={l}
+                style={{display:"flex",alignItems:"center",padding:"6px 8px 6px 13px",borderRadius:7,cursor:"pointer",gap:5,background:active?T.railActive:"transparent"}}
+                onMouseEnter={e=>{if(!active)e.currentTarget.style.background="#F3F2F8";}}
+                onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}>
+                <span style={{fontSize:13,color:active?T.railActiveText:T.text,fontWeight:active?600:400,flex:1}}>{l}</span>
+                {badge&&<span style={{fontSize:10,fontWeight:600,padding:"1px 6px",borderRadius:5,background:T.purpleLight,color:T.railActiveText}}>{badge}</span>}
+                {count!=null&&<span style={{fontSize:13,color:T.text}}>{count}</span>}
+              </div>
+            ))}
+          </div>
+        ))}
+        {["Test","Settings"].map(l=>(
+          <div key={l} style={{padding:"7px 8px",cursor:"pointer",borderRadius:7,marginTop:4}}
+            onMouseEnter={e=>e.currentTarget.style.background="#F3F2F8"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <span style={{fontSize:13,fontWeight:700,color:T.text}}>{l}</span>
+          </div>
+        ))}
+        <div style={{borderTop:`1px solid ${T.border}`,margin:"8px 0 4px"}}/>
+        {["Chat","Email","SMS"].map(l=>(
+          <div key={l} style={{display:"flex",alignItems:"center",padding:"6px 8px 6px 13px",borderRadius:7,cursor:"pointer",gap:5}}
+            onMouseEnter={e=>e.currentTarget.style.background="#F3F2F8"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <span style={{fontSize:13,color:T.text,flex:1}}>{l}</span>
+            <div style={{width:8,height:8,borderRadius:"50%",background:"#22C55E"}}/>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── icon rail ──────────────────────────────────────────────────
+function IconRail() {
+  const icons = [
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 10.5L12 3l9 7.5V21H15v-5h-6v5H3V10.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
+  ];
+  const bottom = [
+    {active:false,svg:<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>},
+    {active:true, svg:<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="currentColor"/></svg>},
+    {active:false,svg:<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.7"/><rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.7"/><rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.7"/></svg>},
+  ];
+  return (
+    <div style={{width:50,background:T.railBg,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 0",gap:3,borderRight:`1px solid ${T.border}`,flexShrink:0}}>
+      <div style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:8,marginBottom:6}}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4M7 4L3 8l4 4" stroke="#4B5563" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </div>
+      {icons.map((svg,i)=>(
+        <div key={i} style={{width:38,height:38,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#9CA3AF",transition:"background .1s"}}
+          onMouseEnter={e=>e.currentTarget.style.background="#E5E3F0"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{svg}</div>
+      ))}
+      <div style={{width:26,height:1,background:T.border,margin:"3px 0"}}/>
+      {bottom.map((it,i)=>(
+        <div key={i} style={{width:38,height:38,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",
+          background:it.active?T.railActive:"transparent",color:it.active?T.railActiveText:"#9CA3AF",transition:"background .1s"}}
+          onMouseEnter={e=>{if(!it.active)e.currentTarget.style.background="#E5E3F0";}}
+          onMouseLeave={e=>{if(!it.active)e.currentTarget.style.background="transparent";}}>{it.svg}</div>
+      ))}
+    </div>
+  );
+}
+
+// ── main app ───────────────────────────────────────────────────
+function App() {
+  const [items,   setItems]   = useState(ITEMS.map(i=>({...i})));
+  const [selId,   setSelId]   = useState(null);   // null = list view
+  const [modal,   setModal]   = useState(false);
+  const [tab,     setTab]     = useState("all");
+  const [search,  setSearch]  = useState("");
+
+  const item = selId ? items.find(i=>i.id===selId) : null;
+
+  const tabs = [
+    {id:"all",        label:"All content",  count:items.length},
+    {id:"guidance",   label:"Guidance",     count:items.filter(i=>i.type==="guidance").length},
+    {id:"help-center",label:"Help Center",  count:items.filter(i=>i.type==="help-center").length},
+    {id:"scheduled",  label:"Scheduled",    count:items.filter(i=>i.schedule).length},
+  ];
+
+  const list = items.filter(it => {
+    if (search && !it.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (tab==="guidance")    return it.type==="guidance";
+    if (tab==="help-center") return it.type==="help-center";
+    if (tab==="scheduled")   return !!it.schedule;
+    return true;
+  });
+
+  const saveSchedule = sched => {
+    setItems(prev => prev.map(x => x.id===selId ? {...x, schedule:sched} : x));
+    setModal(false);
+  };
+  const removeSchedule = () => {
+    setItems(prev => prev.map(x => x.id===selId ? {...x, schedule:null} : x));
+  };
+
+  // ── list (always visible in background) ──────────────────────
+  const ListView = () => (
+    <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden",background:T.white}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"13px 24px",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
+        <span style={{fontSize:18,fontWeight:700,color:T.text,letterSpacing:"-.02em"}}>Knowledge</span>
+        <div style={{display:"flex",gap:8}}>
+          <button style={{padding:"6px 13px",borderRadius:8,border:`1px solid ${T.border}`,background:"#fff",fontSize:13,fontWeight:500,color:T.text,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Go to skills →</button>
+          <button style={{padding:"6px 13px",borderRadius:8,background:T.purple,color:"#fff",border:"none",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>+ Add content</button>
+        </div>
+      </div>
+      <div style={{borderBottom:`1px solid ${T.border}`,padding:"0 24px",display:"flex",flexShrink:0}}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"10px 14px",background:"none",border:"none",cursor:"pointer",fontFamily:"Inter,sans-serif",fontSize:13,fontWeight:tab===t.id?600:400,color:tab===t.id?T.purple:T.textSec,borderBottom:tab===t.id?`2px solid ${T.purple}`:"2px solid transparent",marginBottom:-1,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+            {t.label}
+            <span style={{fontSize:10,fontWeight:600,padding:"1px 6px",borderRadius:10,background:tab===t.id?T.purpleLight:T.gray,color:tab===t.id?T.purple:T.textSec}}>{t.count}</span>
+          </button>
+        ))}
+      </div>
+      <div style={{padding:"9px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
+        <span style={{fontSize:13,color:T.textSec}}>{list.length} items</span>
+        <div style={{position:"relative"}}>
+          <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",fontSize:14,color:T.textMuted}}>⌕</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..." style={{paddingLeft:28,paddingRight:10,paddingTop:7,paddingBottom:7,border:`1px solid ${T.border}`,borderRadius:8,fontSize:13,outline:"none",width:210,fontFamily:"Inter,sans-serif"}}/>
+        </div>
+      </div>
+      <div style={{overflowY:"auto",flex:1}}>
+        {list.map(it => {
+          const sel = it.id === selId;
+          return (
+            <div key={it.id} onClick={()=>setSelId(it.id===selId?null:it.id)}
+              style={{display:"flex",alignItems:"center",padding:"12px 24px",cursor:"pointer",gap:12,
+                borderBottom:`1px solid ${T.gray}`,transition:"background .1s",
+                background: sel ? T.purpleLight : "transparent",
+                borderLeft: sel ? `3px solid ${T.purple}` : "3px solid transparent"}}
+              onMouseEnter={e=>{ if(!sel) e.currentTarget.style.background="#F9F8FF"; }}
+              onMouseLeave={e=>{ if(!sel) e.currentTarget.style.background="transparent"; }}>
+              <div style={{width:30,height:30,borderRadius:7,background:sel?T.purpleLight:T.gray,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <TypeIcon type={it.type} c={sel?T.purple:"#6B7280"}/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:sel?600:500,color:sel?T.purpleDark:T.text,marginBottom:2}}>{it.title}</div>
+                <div style={{fontSize:12,color:sel?T.purpleMid:T.textMuted,display:"flex",alignItems:"center",gap:8}}>
+                  <span>{it.type==="help-center"?"Help Center article":"Guidance"}</span>
+                  {it.schedule && <span style={{display:"flex",alignItems:"center",gap:4}}><CalSvg c={sel?T.purple:"#9CA3AF"} s={11}/>{it.schedule.from}{it.schedule.until?" → "+it.schedule.until:" onwards"}</span>}
+                  {!it.schedule && <span>Always active</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                {it.schedule&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:T.purpleLight,color:T.purple,fontWeight:600}}>Scheduled</span>}
+                {it.source==="copilot"&&<span style={{fontSize:11,padding:"2px 7px",borderRadius:10,background:T.blueLight,color:T.blue,fontWeight:500}}>🤖</span>}
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{transform:sel?"rotate(90deg)":"none",transition:"transform .2s"}}>
+                  <path d="M6 12l4-4-4-4" stroke={sel?T.purple:"#9CA3AF"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // ── slide-in panel (overlays the list from the right) ─────────
+  const ItemPanel = () => (
+    <div style={{position:"absolute",top:0,right:0,bottom:0,width:"72%",display:"flex",flexDirection:"column",
+      background:T.white,borderLeft:`1px solid ${T.border}`,
+      boxShadow:"-8px 0 32px rgba(0,0,0,.10)",zIndex:20}}>
+      {/* Panel header */}
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
+        <span style={{fontSize:13,fontWeight:600,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title}</span>
+        <div style={{display:"flex",gap:5,flexShrink:0}}>
+          {[
+            <svg key="e" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5L13.5 4.5 5 13H3v-2L11.5 2.5z" stroke="#6B7280" strokeWidth="1.4" strokeLinejoin="round"/></svg>,
+            <svg key="h" width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="#6B7280" strokeWidth="1.3"/><path d="M8 5v3l2 1" stroke="#6B7280" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+            <svg key="d" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6 5V3h4v2M5.5 5l.5 8h4l.5-8" stroke={T.red} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+          ].map((ico,i)=>(
+            <button key={i} style={{width:26,height:26,borderRadius:6,border:`1px solid ${T.border}`,background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{ico}</button>
+          ))}
+          <button style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${T.border}`,background:"#fff",fontSize:12,fontWeight:500,color:T.text,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Test</button>
+          <button onClick={()=>setSelId(null)} style={{width:26,height:26,borderRadius:6,border:`1px solid ${T.border}`,background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+      {/* Panel body: content + side panel */}
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        <div style={{flex:1,overflowY:"auto",padding:"28px 36px",minWidth:0}}>
+          <h1 style={{fontSize:20,fontWeight:700,color:T.text,letterSpacing:"-.02em",marginBottom:20,lineHeight:1.3}}>{item.title}</h1>
+          <ContentRenderer text={item.content}/>
+        </div>
+        <SidePanel item={item} onEditSchedule={()=>setModal(true)} onRemoveSchedule={removeSchedule}/>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{background:T.bg,display:"flex",height:"100vh",fontFamily:"Inter,sans-serif",overflow:"hidden"}}>
+      <IconRail/>
+      <NavPanel/>
+      {/* Content column — list always visible; panel overlays from the right */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:T.white,position:"relative"}}>
+        <ListView/>
+        {item && <ItemPanel/>}
+      </div>
+      {modal && item && (
+        <ScheduleModal key={`modal_${selId}`} item={item} onClose={()=>setModal(false)} onSave={saveSchedule}/>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
