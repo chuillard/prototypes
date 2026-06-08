@@ -6,7 +6,27 @@ Interactive UI prototypes for Gorgias product features. Open any `.html` file di
 
 ---
 
-## Knowledge — Scheduled Activation Windows (NEW)
+## Agent Behavior — Scope (NEW)
+
+**File:** `scope-prototype.html` / `scope-prototype.jsx`
+
+Unified topic control for AI Agent's qualify step. Merchants set how AI Agent responds to each type of message from a single flat list — no separate cards or sections.
+
+### What's in the prototype
+
+- **Flat topic list** inside a single card, three sections separated by inline labels: Always escalate (locked), Configurable (pre-populated), Your topics (custom additions)
+- **Three-state selector per row:** Handle / Handover / Deflect — inline button group, active state highlighted in color (green / purple / dark)
+- **Locked rows:** Gorgias-managed hard stops (self-harm, violence, lawsuit, PII) show a fixed "Always handover" pill with a lock icon — same visual language as the selector, just not interactive
+- **Configurable rows:** 17 pre-populated topics, all default to Handle. Selecting a non-Handle state highlights the row with a purple tint
+- **Custom topic input:** dashed add row at the bottom with a free-text input. Press Enter or click Add to create a new row, which defaults to Handover and gets the full selector
+
+### Context
+
+Companion to the [Agent Behavior vision doc](https://app.notion.com/p/3761ae2178f5815ebba3f925c11f4970).
+
+---
+
+## Knowledge — Scheduled Activation Windows
 
 **File:** `knowledge-scheduling-v4.html`
 

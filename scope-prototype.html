@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Behavior — Scope</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#F9F8F6;">
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+const LOCKED_TOPICS = [
+  { id: "self-harm",  label: "Self-harm",                          description: "Customer expresses intent or history of self-harm" },
+  { id: "violence",   label: "Violence / threats",                 description: "Customer threatens or describes violence" },
+  { id: "lawsuit",    label: "Threat of lawsuit",                  description: "Customer explicitly threatens legal action" },
+  { id: "pii",        label: "PII / financial credentials",        description: "Customer sharing or requesting bank/card details" },
+];
+
+const CONFIGURABLE_TOPICS = [
+  { id: "support",    label: "Customer support requests",          default: "handle" },
+  { id: "shopping",   label: "Shopping & product questions",       default: "handle" },
+  { id: "returns",    label: "Returns & exchanges",                default: "handle" },
+  { id: "orders",     label: "Order status & tracking",            default: "handle" },
+  { id: "complaints", label: "Complaints & negative feedback",     default: "handle" },
+  { id: "marketing",  label: "Marketing & partnership outreach",   default: "handle" },
+  { id: "wholesale",  label: "Wholesale & B2B inquiries",          default: "handle" },
+  { id: "affiliate",  label: "Affiliate & influencer inquiries",   default: "handle" },
+  { id: "press",      label: "Press & media inquiries",            default: "handle" },
+  { id: "jobs",       label: "Job applications",                   default: "handle" },
+  { id: "supplier",   label: "Supplier & vendor inquiries",        default: "handle" },
+  { id: "automated",  label: "Automated / out-of-office replies",  default: "handle" },
+  { id: "liability",  label: "Product liability claim",            default: "handle" },
+  { id: "gdpr",       label: "Data privacy / GDPR request",        default: "handle" },
+  { id: "fraud",      label: "Fraud / chargeback suspicion",       default: "handle" },
+  { id: "legal",      label: "Legal or compliance question",       default: "handle" },
+  { id: "age",        label: "Age-restricted content",             default: "handle" },
+];
+
+const STATES = [
+  { id: "handle",   label: "Handle",   color: "#2D8A5E", bg: "#EBF7F2", border: "#A8DBBF" },
+  { id: "handover", label: "Handover", color: "#6D28D9", bg: "#F3EEFF", border: "#C4A8F5" },
+  { id: "deflect",  label: "Deflect",  color: "#374151", bg: "#F3F1EE", border: "#C9C3BD" },
+];
+
+const stateMap = Object.fromEntries(STATES.map(s => [s.id, s]));
+
+function StateSelector({ value, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 3, background: "#EDEBE8", borderRadius: 10, padding: 3 }}>
+      {STATES.map(s => {
+        const active = value === s.id;
+        return (
+          <button
+            key={s.id}
+            onClick={() => onChange(s.id)}
+            style={{
+              fontSize: 12, fontWeight: active ? 600 : 500,
+              padding: "5px 12px", borderRadius: 8,
+              border: "none", cursor: "pointer", transition: "all 0.15s",
+              background: active ? (s.id === "handle" ? "#2D8A5E" : s.id === "handover" ? "#6D28D9" : "#1A1A1A") : "transparent",
+              color: active ? "#FFFFFF" : "#7A7470",
+            }}
+          >
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TopicRow({ label, description, state, onChange, locked, isCustom, onRemove }) {
+  const isNonDefault = !locked && state !== "handle";
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 16,
+      padding: "12px 16px",
+      borderBottom: "1px solid #F0ECE8",
+      background: isNonDefault ? "#FDFBFF" : "transparent",
+      transition: "background 0.15s",
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: isNonDefault ? 500 : 400, color: locked ? "#9B9490" : "#1A1A1A" }}>{label}</div>
+        {description && <div style={{ fontSize: 12, color: "#B0A9A4", marginTop: 2 }}>{description}</div>}
+      </div>
+
+      {locked ? (
+        <span style={{
+          fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 20,
+          background: "#F3EEFF", color: "#6D28D9", border: "1.5px solid #C4A8F5",
+          display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+        }}>
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+            <rect x="1.5" y="4" width="6" height="4.5" rx="1" fill="#6D28D9"/>
+            <path d="M3 4V2.5a1.5 1.5 0 013 0V4" stroke="#6D28D9" strokeWidth="1.1" strokeLinecap="round"/>
+          </svg>
+          Always handover
+        </span>
+      ) : (
+        <StateSelector value={state} onChange={onChange} />
+      )}
+
+      {isCustom && (
+        <button onClick={onRemove} style={{ color: "#C9C3BD", fontSize: 18, cursor: "pointer", background: "none", border: "none", padding: "0 2px", lineHeight: 1, flexShrink: 0, marginLeft: -8 }}>×</button>
+      )}
+    </div>
+  );
+}
+
+function SectionLabel({ label, description }) {
+  return (
+    <div style={{ padding: "18px 16px 8px", display: "flex", alignItems: "baseline", gap: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#6B6460", textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap" }}>{label}</div>
+      {description && <div style={{ fontSize: 12, color: "#B0A9A4" }}>{description}</div>}
+    </div>
+  );
+}
+
+function ScopePrototype() {
+  const [states, setStates] = useState(
+    Object.fromEntries(CONFIGURABLE_TOPICS.map(t => [t.id, t.default]))
+  );
+  const [customTopics, setCustomTopics] = useState([]);
+  const [customStates, setCustomStates] = useState({});
+  const [inputValue, setInputValue] = useState("");
+
+  const setState = (id, val) => setStates(prev => ({ ...prev, [id]: val }));
+  const setCustomState = (id, val) => setCustomStates(prev => ({ ...prev, [id]: val }));
+  const addCustom = () => {
+    if (!inputValue.trim()) return;
+    const id = `c-${Date.now()}`;
+    setCustomTopics(prev => [...prev, { id, label: inputValue.trim() }]);
+    setCustomStates(prev => ({ ...prev, [id]: "handover" }));
+    setInputValue("");
+  };
+  const removeCustom = (id) => setCustomTopics(prev => prev.filter(t => t.id !== id));
+
+  return (
+    <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: "#F9F8F6", minHeight: "100vh", padding: "40px 24px" }}>
+      <div style={{ maxWidth: 780, margin: "0 auto" }}>
+
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", marginBottom: 6 }}>Scope</div>
+          <div style={{ fontSize: 14, color: "#8A837D", lineHeight: 1.6, maxWidth: 560 }}>
+            Set how AI Agent responds to each type of message. <strong>Handle</strong> means AI Agent responds normally. <strong>Handover</strong> transfers to a human. <strong>Deflect</strong> sends a polite canned response with no transfer.
+          </div>
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1.5px solid #E8E4DD", borderRadius: 16, overflow: "hidden" }}>
+
+          <SectionLabel label="Always escalate" description="Gorgias-managed hard stops. Not configurable." />
+          {LOCKED_TOPICS.map(t => (
+            <TopicRow key={t.id} label={t.label} description={t.description} state="handover" locked />
+          ))}
+
+          <SectionLabel label="Configurable" description="Set how AI Agent handles each topic." />
+          {CONFIGURABLE_TOPICS.map(t => (
+            <TopicRow key={t.id} label={t.label} state={states[t.id]} onChange={val => setState(t.id, val)} />
+          ))}
+
+          <SectionLabel label="Your topics" description="Add topics specific to your brand." />
+          {customTopics.map(t => (
+            <TopicRow key={t.id} label={t.label} state={customStates[t.id]} onChange={val => setCustomState(t.id, val)} isCustom onRemove={() => removeCustom(t.id)} />
+          ))}
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+            <div style={{ width: 20, height: 20, borderRadius: 6, border: "2px dashed #C9C3BD", display: "flex", alignItems: "center", justifyContent: "center", color: "#C9C3BD", fontSize: 16, flexShrink: 0, lineHeight: 1 }}>+</div>
+            <input
+              style={{ flex: 1, border: "none", outline: "none", fontSize: 14, color: "#4A4540", background: "transparent", fontFamily: "inherit" }}
+              placeholder="Add a topic your brand needs to handle differently..."
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addCustom()}
+            />
+            {inputValue && (
+              <button onClick={addCustom} style={{ fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", background: "#6D28D9", color: "white" }}>Add</button>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<ScopePrototype />);
+</script>
+</body>
+</html>
