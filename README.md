@@ -16,9 +16,10 @@ Unified topic control for AI Agent's qualify step. Merchants set how AI Agent re
 
 - **Flat topic list** inside a single card, three sections separated by inline labels: Always escalate (locked), Configurable (pre-populated), Your topics (custom additions)
 - **Three-state selector per row:** Handle / Handover / Deflect — inline button group, active state highlighted in color (green / purple / dark)
-- **Locked rows:** Gorgias-managed hard stops (self-harm, violence, lawsuit, PII) show a fixed "Always handover" pill with a lock icon — same visual language as the selector, just not interactive
-- **Configurable rows:** 17 pre-populated topics, all default to Handle. Selecting a non-Handle state highlights the row with a purple tint
-- **Custom topic input:** dashed add row at the bottom with a free-text input. Press Enter or click Add to create a new row, which defaults to Handover and gets the full selector
+- **Locked rows:** Gorgias-managed hard stops (self-harm, violence, lawsuit, PII) show a fixed "Always handover" pill with a lock icon — same visual language as the selector, not interactive
+- **Configurable rows:** 12 pre-populated topics drawn from the qualify step (outreach, OOO, liability, GDPR, fraud, legal, age-restricted, etc.). All default to Handle. Selecting Handover or Deflect highlights the row with a purple tint.
+- **Skill link:** Handle rows show either a linked skill chip (purple, with skill name) or an "Add a skill +" prompt. Disappears when the row is set to Handover or Deflect.
+- **Custom topic input (Tier 3):** dashed add row at the bottom with a free-text input. New topics default to Handover and only offer Handover or Deflect — not Handle.
 
 ### Context
 
