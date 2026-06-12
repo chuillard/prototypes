@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversation Starters - Unified</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: Inter, sans-serif; }
+    #root { height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+
+const { useState, useCallback, useRef, useEffect } = React;
+
+// ════════════════════════════════════════════════════════════════
+// DESIGN TOKENS (exact copy from gorgias-shell.jsx)
+// ════════════════════════════════════════════════════════════════
+const tokens = {
+  purple: "#7C3AED", purpleLight: "#EDE9FE", purpleMid: "#A78BFA", accent: "#7C3AED",
+  green: "#059669", greenLight: "#D1FAE5", red: "#EF4444",
+  yellow: "#F59E0B", yellowLight: "#FEF3C7",
+  blue: "#1D4ED8", blueLight: "#DBEAFE",
+  text: "#111827", textSecondary: "#6B7280", textMuted: "#9CA3AF",
+  border: "#E8E6DF", bgPage: "#F7F6F3", bgWhite: "#FFFFFF", grayLight: "#F3F2EE",
+  railBg: "#F0EEF8", railActive: "#EDE9FE", railActiveText: "#6D28D9", railInactive: "#4B5563",
+};
+
+const css = {
+  page: { background: tokens.bgPage, display: "flex", flexDirection: "row", height: "100vh", padding: 8, fontFamily: "Inter, sans-serif", boxSizing: "border-box" },
+  contentContainer: { background: tokens.bgWhite, borderRadius: 16, border: `1px solid ${tokens.border}`, overflowY: "auto", flexGrow: 1, display: "flex", flexDirection: "column" },
+};
+
+const brandColor = "#C41E3A";
+const brandBgGradient = "linear-gradient(180deg, #E8384F 0%, #D42E45 60%, #C4253B 100%)";
+
+// ════════════════════════════════════════════════════════════════
+// ICON RAIL (exact copy from gorgias-shell.jsx)
+// ════════════════════════════════════════════════════════════════
+function RailIcon({ active, children, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      width: 40, height: 40, borderRadius: 10,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      cursor: "pointer",
+      background: active ? tokens.railActive : "transparent",
+      color: active ? tokens.railActiveText : tokens.railInactive,
+    }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#E5E3F0"; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? tokens.railActive : "transparent"; }}>
+      {children}
+    </div>
+  );
+}
+
+const defaultRailIcons = [
+  { id: "home", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 10.5L12 3l9 7.5V21H15v-5h-6v5H3V10.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg> },
+  { id: "search", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
+  { id: "notifications", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>, badge: 1 },
+  { id: "divider" },
+  { id: "tickets", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg> },
+  { id: "ai-agent", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="currentColor" opacity="0.9"/><circle cx="18" cy="6" r="2" fill="currentColor" opacity="0.6"/><circle cx="6" cy="18" r="1.5" fill="currentColor" opacity="0.5"/></svg> },
+  { id: "flows", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h3a2 2 0 012 2v8a2 2 0 002 2h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M21 18h-3a2 2 0 01-2-2V8a2 2 0 00-2-2H11" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><circle cx="3" cy="6" r="2" stroke="currentColor" strokeWidth="1.7"/><circle cx="21" cy="18" r="2" stroke="currentColor" strokeWidth="1.7"/></svg> },
+  { id: "revenue", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 7v10M9.5 9.5C9.5 8.67 10.67 8 12 8s2.5.67 2.5 1.5S13.33 11 12 11s-2.5.67-2.5 1.5S10.67 14.5 12 14.5s2.5-.67 2.5-1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: "customers", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="3" stroke="currentColor" strokeWidth="1.7"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M16 3.13a4 4 0 010 7.75M21 21v-2a4 4 0 00-3-3.87" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg> },
+  { id: "analytics", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.7"/><rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.7"/><rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.7"/></svg> },
+];
+
+function IconRail({ activeId = "ai-agent" }) {
+  return (
+    <div style={{
+      width: 56, background: tokens.railBg,
+      display: "flex", flexDirection: "column", alignItems: "center",
+      padding: "10px 0", gap: 4,
+      borderRight: `1px solid ${tokens.border}`,
+    }}>
+      <div style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", borderRadius: 8, marginBottom: 6 }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M10 4L6 8l4 4" stroke="#4B5563" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M7 4L3 8l4 4" stroke="#4B5563" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {defaultRailIcons.map((item) => {
+        if (item.id === "divider") return <div key="divider" style={{ width: 28, height: 1, background: tokens.border, margin: "4px 0" }} />;
+        return (
+          <div key={item.id} style={{ position: "relative" }}>
+            <RailIcon active={activeId === item.id}>{item.icon}</RailIcon>
+            {item.badge != null && (
+              <div style={{
+                position: "absolute", top: 4, right: 4,
+                width: 16, height: 16, borderRadius: "50%",
+                background: tokens.red,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, fontWeight: 700, color: "#fff",
+                border: `2px solid ${tokens.railBg}`, lineHeight: 1,
+              }}>{item.badge}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// NAV PANEL (exact copy from gorgias-shell.jsx)
+// ════════════════════════════════════════════════════════════════
+function NavSection({ label }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "8px 8px 4px", cursor: "pointer",
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textSecondary, letterSpacing: "0.01em" }}>{label}</span>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <path d="M4 10l4-4 4 4" stroke="#9CA3AF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  );
+}
+
+function NavSubItem({ label, isActive, badge, count, dot, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      display: "flex", alignItems: "center",
+      padding: "7px 8px 7px 14px",
+      borderRadius: 8, cursor: "pointer",
+      background: isActive ? tokens.railActive : "transparent",
+      gap: 6,
+    }}
+      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#F3F2F8"; }}
+      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? tokens.railActive : "transparent"; }}>
+      <span style={{
+        fontSize: 14,
+        color: isActive ? tokens.railActiveText : tokens.text,
+        fontWeight: isActive ? 600 : 400,
+        flex: 1,
+      }}>{label}</span>
+      {badge && (
+        <span style={{
+          fontSize: 11, fontWeight: 600, padding: "2px 7px",
+          borderRadius: 6, background: tokens.purpleLight, color: tokens.railActiveText,
+        }}>{badge}</span>
+      )}
+      {count != null && (
+        <span style={{ fontSize: 14, color: tokens.text, fontWeight: 400 }}>{count}</span>
+      )}
+      {dot && (
+        <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+      )}
+    </div>
+  );
+}
+
+function NavTopItem({ label }) {
+  return (
+    <div style={{ padding: "8px 8px", cursor: "pointer", borderRadius: 8 }}
+      onMouseEnter={e => e.currentTarget.style.background = "#F3F2F8"}
+      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>{label}</span>
+    </div>
+  );
+}
+
+function ShopifyAccountRow({ storeName = "one-bone" }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 10px", borderBottom: `1px solid ${tokens.border}` }}>
+      <svg width="26" height="26" viewBox="0 0 44 44" fill="none">
+        <rect width="44" height="44" rx="8" fill="#96BF48"/>
+        <path d="M30 15s-.1-.8-.6-1.3c-.5-.5-1.2-.8-1.2-.8s-.1-1.3-.3-2c-.3-1.3-1.5-2-2.8-1.8l-.4.1C24 8.4 23 8 22 8c-2 0-3 1.5-3.3 2.9l-3.4.7c-.5.1-.9.6-.9 1.1l-.4 14 11.8 2 4-1.2L30 15zm-8-5.5c.5 0 1 .2 1.4.5l-3 .6c.3-1 .9-1.1 1.6-1.1zm-3.5 4.8l4.6-.9c-.3-.8-.8-1.3-1.1-1.6l-3.8.8.3 1.7zm7.3-1.5c-.3-.3-.8-.7-1.5-.9l-4.4.9-.2-1.5 3-.6c.1-.5.3-1 .5-1.3.5.2.9.5 1.3.9.6.6.8 1.4.8 1.5h.5z" fill="white"/>
+        <path d="M14 37l2-11 8 1.5L22 37H14z" fill="#5E8E3E"/>
+        <path d="M22 27.5l2 9.5h6l-2-11-6 1.5z" fill="#5E8E3E"/>
+      </svg>
+      <span style={{ fontSize: 14, fontWeight: 500, color: tokens.text }}>{storeName}</span>
+      <div style={{ marginLeft: "auto", width: 10, height: 10, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+    </div>
+  );
+}
+
+// AI Agent nav config — "Chat" under Deploy is active
+const navConfig = {
+  title: "AI Agent",
+  storeName: "one-bone",
+  sections: [
+    {
+      label: "Analyze",
+      items: [
+        { label: "Overview" },
+        { label: "Intents" },
+        { label: "Opportunities", badge: "Beta", count: 30 },
+      ],
+    },
+    {
+      label: "Train",
+      items: [
+        { label: "Knowledge" },
+        { label: "Support Actions" },
+        { label: "Products" },
+        { label: "Shopping Assistant" },
+      ],
+    },
+    { topItem: "Test" },
+    {
+      label: "Deploy",
+      items: [
+        { label: "Chat", isActive: true, dot: true },
+        { label: "Email", dot: true },
+        { label: "SMS", dot: true },
+      ],
+    },
+    { topItem: "Settings" },
+  ],
+};
+
+function NavPanel({ config, onItemClick }) {
+  const nav = config || navConfig;
+  return (
+    <div style={{
+      width: 220, background: tokens.bgWhite,
+      display: "flex", flexDirection: "column",
+      borderRight: `1px solid ${tokens.border}`,
+      overflowY: "auto",
+    }}>
+      <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${tokens.border}` }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: tokens.text, letterSpacing: "-0.02em" }}>{nav.title}</span>
+      </div>
+      <ShopifyAccountRow storeName={nav.storeName} />
+      <div style={{ padding: "8px 8px", display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
+        {nav.sections.map((section, i) => {
+          if (section.topItem) {
+            return <NavTopItem key={section.topItem} label={section.topItem} />;
+          }
+          return (
+            <div key={section.label || i}>
+              <NavSection label={section.label} />
+              {section.items?.map((item) => (
+                <NavSubItem key={item.label} {...item} onClick={() => onItemClick?.(item.label)} />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// TOGGLE (exact copy from gorgias-components.jsx)
+// ════════════════════════════════════════════════════════════════
+function Toggle({ enabled, onToggle }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div onClick={onToggle} style={{
+        width: 36, height: 20, borderRadius: 10, cursor: "pointer",
+        background: enabled ? tokens.accent : "#D1D5DB",
+        position: "relative", transition: "background 0.2s", flexShrink: 0,
+      }}>
+        <div style={{
+          position: "absolute", top: 3, left: enabled ? 19 : 3,
+          width: 14, height: 14, borderRadius: "50%",
+          background: "#fff", transition: "left 0.2s",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        }} />
+      </div>
+      <span style={{ fontSize: 12, color: enabled ? tokens.green : tokens.textMuted, fontWeight: 500 }}>
+        {enabled ? "Enabled" : "Disabled"}
+      </span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// AVAILABLE SKILLS (for the skill picker)
+// ════════════════════════════════════════════════════════════════
+const availableSkills = [
+  { name: "Promo codes or free shipping", suggestedStarter: "Do you have any promo codes?", enabled: true },
+  { name: "Order status, tracking or delivery timing", suggestedStarter: "Where is my order?", enabled: true },
+  { name: "Shipping address update", suggestedStarter: "I need to update my shipping address", enabled: true },
+  { name: "Product edits in an order", suggestedStarter: "I want to change products in my order", enabled: true },
+  { name: "Order cancellation", suggestedStarter: "I need to cancel my order", enabled: true },
+  { name: "Missing items from an order", suggestedStarter: "Items are missing from my order", enabled: true },
+  { name: "Damaged, defective or broken item", suggestedStarter: "I received a damaged item", enabled: true },
+  { name: "Return, exchange or refund status", suggestedStarter: "I want to return or exchange an item", enabled: true },
+  { name: "Subscription cancellation", suggestedStarter: "I need to cancel my subscription", enabled: true },
+  { name: "Subscription modification (pause, skip, resume)", suggestedStarter: "I want to update my subscription", enabled: true },
+];
+
+// ════════════════════════════════════════════════════════════════
+// FLOW REPLACEMENT SUGGESTIONS (maps flow names to actions)
+// ════════════════════════════════════════════════════════════════
+const flowReplacements = {
+  "Tennis Racket Finder": {
+    completionRate: 12,
+    suggestedLabel: "Shopping Assistant",
+    navTarget: "Shopping Assistant",
+  },
+  "I need to manage my subscription": {
+    completionRate: 48,
+    suggestedLabel: "Support Action",
+    navTarget: "Support Actions",
+  },
+};
+
+// ════════════════════════════════════════════════════════════════
+// AI-RECOMMENDED STARTERS — mined from ticket history
+// ════════════════════════════════════════════════════════════════
+const aiRecommendations = [
+  { text: "Do you ship internationally?", tickets: 412, automation: 91, intent: "Shipping / Info" },
+  { text: "How do I apply my discount code?", tickets: 287, automation: 88, intent: "Promo / Discount" },
+  { text: "Can I change my delivery address?", tickets: 198, automation: 84, intent: "Order / Address change" },
+];
+
+// ════════════════════════════════════════════════════════════════
+// SKILL PICKER MODAL
+// ════════════════════════════════════════════════════════════════
+function SkillPickerModal({ open, onClose, onSelect, existingSkillNames }) {
+  const [search, setSearch] = useState("");
+  if (!open) return null;
+
+  const filtered = availableSkills.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) &&
+    !existingSkillNames.includes(s.name)
+  );
+
+  return (
+    <>
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 200,
+      }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: 440, maxHeight: "70vh", background: tokens.bgWhite, borderRadius: 16,
+        boxShadow: "0 24px 48px rgba(0,0,0,0.2)", zIndex: 201,
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        fontFamily: "Inter, sans-serif",
+      }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: tokens.text }}>Add from Skill</h2>
+            <button onClick={onClose} style={{
+              width: 28, height: 28, borderRadius: 6, border: `1px solid ${tokens.border}`,
+              background: "#fff", cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", flexShrink: 0,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M3 3l10 10M13 3L3 13" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <p style={{ fontSize: 13, color: tokens.textSecondary, margin: "0 0 14px", lineHeight: 1.4 }}>
+            Select a Skill to create a conversation starter. The starter will trigger AI Agent with that Skill's context.
+          </p>
+          <div style={{ position: "relative", marginBottom: 12 }}>
+            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: tokens.textMuted }}>⌕</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search skills..."
+              autoFocus
+              style={{
+                width: "100%", boxSizing: "border-box",
+                paddingLeft: 30, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
+                border: `1px solid ${tokens.border}`, borderRadius: 8,
+                fontSize: 13, color: tokens.text, background: tokens.bgWhite,
+                outline: "none", fontFamily: "inherit",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Skill list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: "24px 12px", textAlign: "center", color: tokens.textMuted, fontSize: 13 }}>
+              {search ? "No matching skills found" : "All skills are already added as starters"}
+            </div>
+          )}
+          {filtered.map((skill) => (
+            <div key={skill.name}
+              onClick={() => { onSelect(skill); }}
+              style={{
+                padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 12,
+                marginBottom: 2,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = tokens.bgPage}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                background: tokens.purpleLight,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.9"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>{skill.name}</div>
+                <div style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>"{skill.suggestedStarter}"</div>
+              </div>
+              {!skill.enabled && (
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: tokens.grayLight, color: tokens.textMuted, fontWeight: 500, flexShrink: 0 }}>Disabled</span>
+              )}
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M6 4l4 4-4 4" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// FLOW MIGRATION NUDGE
+// ════════════════════════════════════════════════════════════════
+function FlowMigrationNudge({ flowName, onNavigate }) {
+  const replacement = flowReplacements[flowName];
+  if (!replacement) return null;
+
+  return (
+    <div style={{
+      margin: "0 12px 4px 38px", padding: "4px 0",
+      display: "flex", alignItems: "center", gap: 6,
+      fontSize: 11, color: tokens.textMuted, lineHeight: 1.3,
+    }}>
+      <span style={{ color: "#D97706", fontWeight: 600, flexShrink: 0 }}>{replacement.completionRate}% completion</span>
+      <span style={{ color: tokens.border }}>·</span>
+      <span>Set up <span onClick={() => onNavigate?.(replacement.navTarget)} style={{ color: tokens.purple, fontWeight: 500, cursor: "pointer", textDecoration: "underline", textDecorationColor: tokens.purpleMid, textUnderlineOffset: 2 }}>{replacement.suggestedLabel}</span> instead</span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// CONVERSATION STARTERS — Unified card (Skills, Flows, custom, AI-recommended)
+// ════════════════════════════════════════════════════════════════
+
+const MAX_STARTERS = 8;
+
+function ConversationStartersCard({ starters, setStarters, enabled, setEnabled, onNavigate, filterType, title, description }) {
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const [flowEditorIdx, setFlowEditorIdx] = useState(null);
+  const [skillPopoverIdx, setSkillPopoverIdx] = useState(null);
+  const [showSkillPicker, setShowSkillPicker] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [recs, setRecs] = useState(aiRecommendations);
+  const [recsPulse, setRecsPulse] = useState(false);
+
+  // Filter starters by type for this card
+  const displayedStarters = filterType ? starters.filter(s => s.type === filterType) : starters;
+
+  // Map a displayed-index back to the original starters array index
+  const origIdx = (i) => {
+    if (!filterType) return i;
+    const target = displayedStarters[i];
+    return starters.indexOf(target);
+  };
+
+  const removeStarter = (i) => {
+    const oi = origIdx(i);
+    setStarters(starters.filter((_, idx) => idx !== oi));
+  };
+
+  const toggleEditing = (i) => {
+    const oi = origIdx(i);
+    const n = [...starters];
+    n[oi] = { ...n[oi], editing: !n[oi].editing };
+    setStarters(n);
+  };
+
+  // Per-type edit handler
+  const handleEdit = (i) => {
+    const starter = displayedStarters[i];
+    const oi = origIdx(i);
+    if (starter.type === "flow") {
+      setFlowEditorIdx(oi);
+    } else {
+      // Skill, custom, and AI starters are all renamable inline
+      toggleEditing(i);
+    }
+  };
+
+  const updateText = (i, text) => {
+    const oi = origIdx(i);
+    const n = [...starters];
+    n[oi] = { ...n[oi], text };
+    setStarters(n);
+  };
+
+  // Drag-and-drop handlers — reorder within the filtered subset only
+  const handleDragStart = (i) => setDragIdx(i);
+  const handleDragOver = (e, i) => { e.preventDefault(); setDragOverIdx(i); };
+  const handleDrop = (i) => {
+    if (dragIdx === null || dragIdx === i) { setDragIdx(null); setDragOverIdx(null); return; }
+    if (filterType) {
+      // Reorder the filtered subset and rebuild the full array
+      const reordered = [...displayedStarters];
+      const [moved] = reordered.splice(dragIdx, 1);
+      reordered.splice(i, 0, moved);
+      const slots = starters.map((s, idx) => s.type === filterType ? idx : -1).filter(idx => idx >= 0);
+      const newStarters = [...starters];
+      slots.forEach((slotIdx, k) => { newStarters[slotIdx] = reordered[k]; });
+      setStarters(newStarters);
+    } else {
+      const n = [...starters];
+      const [moved] = n.splice(dragIdx, 1);
+      n.splice(i, 0, moved);
+      setStarters(n);
+    }
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+  const handleDragEnd = () => { setDragIdx(null); setDragOverIdx(null); };
+
+  // Add from skill picker
+  const handleAddFromSkill = (skill) => {
+    const newStarter = {
+      text: skill.suggestedStarter,
+      type: "skill",
+      skillName: skill.name,
+      editing: false,
+      clicks: null,
+    };
+    setStarters([...starters, newStarter]);
+    setShowSkillPicker(false);
+  };
+
+  const handleAddCustom = () => {
+    setStarters([...starters, { text: "", type: "custom", editing: true, clicks: null }]);
+    setShowAddMenu(false);
+  };
+
+  const handleAddRecommendation = (rec) => {
+    setStarters([...starters, { text: rec.text, type: "ai", editing: false, clicks: null }]);
+    setRecs(recs.filter(r => r.text !== rec.text));
+  };
+
+  const pulseRecs = () => {
+    setShowAddMenu(false);
+    setRecsPulse(true);
+    setTimeout(() => setRecsPulse(false), 1500);
+  };
+
+  const existingSkillNames = starters.filter(s => s.type === "skill").map(s => s.skillName);
+
+  const DragDots = () => (
+    <svg width="12" height="16" viewBox="0 0 12 16" fill="none" style={{ cursor: "grab", flexShrink: 0 }}>
+      <circle cx="3" cy="3" r="1.5" fill="#9CA3AF"/><circle cx="9" cy="3" r="1.5" fill="#9CA3AF"/>
+      <circle cx="3" cy="8" r="1.5" fill="#9CA3AF"/><circle cx="9" cy="8" r="1.5" fill="#9CA3AF"/>
+      <circle cx="3" cy="13" r="1.5" fill="#9CA3AF"/><circle cx="9" cy="13" r="1.5" fill="#9CA3AF"/>
+    </svg>
+  );
+
+  // Find max clicks for relative sizing (across the displayed subset)
+  const maxClicks = Math.max(...displayedStarters.map(s => s.clicks || 0), 1);
+
+  // Tooltip wrapper
+  const Tooltip = ({ children, text, width = 220 }) => {
+    const [show, setShow] = useState(false);
+    return (
+      <div style={{ position: "relative", flexShrink: 0, display: "flex", alignItems: "center" }}
+        onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+        {children}
+        {show && (
+          <div style={{
+            position: "absolute", bottom: "calc(100% + 8px)", left: 0,
+            padding: "7px 10px", borderRadius: 6, background: tokens.text, color: "#fff",
+            fontSize: 11, lineHeight: 1.4, width, whiteSpace: "normal",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)", zIndex: 1000, textAlign: "left",
+            pointerEvents: "none",
+          }}>
+            {text}
+            <div style={{
+              position: "absolute", bottom: -3, left: 8, transform: "rotate(45deg)",
+              width: 6, height: 6, background: tokens.text,
+            }} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Type badge with tooltip for each row
+  const TypeBadge = ({ type, skillName }) => {
+    if (type === "skill") {
+      return (
+        <Tooltip text={`Triggers the "${skillName}" Skill. You can rename the display text — the Skill connection is preserved.`} width={240}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, cursor: "default", color: tokens.purple }}>
+            <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="currentColor" opacity="0.9"/>
+          </svg>
+        </Tooltip>
+      );
+    }
+    if (type === "flow") return (
+      <Tooltip text="Linked to a legacy Flow. Flows can no longer be created — consider replacing with a Skill-linked starter for better AI Agent results." width={260}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, cursor: "default" }}>
+          <path d="M3 6h3a2 2 0 012 2v8a2 2 0 002 2h3" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+          <path d="M21 18h-3a2 2 0 01-2-2V8a2 2 0 00-2-2H11" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+          <circle cx="3" cy="6" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
+          <circle cx="21" cy="18" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
+        </svg>
+      </Tooltip>
+    );
+    if (type === "custom") return (
+      <Tooltip text="Written manually. AI Agent answers from your knowledge." width={200}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, cursor: "default" }}>
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={tokens.blue} strokeWidth="1.7" strokeLinecap="round"/>
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={tokens.blue} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </Tooltip>
+    );
+    if (type === "ai") return (
+      <Tooltip text="Suggested from your ticket history — a top shopper question AI Agent already automates well." width={240}>
+        <span style={{ fontSize: 13, lineHeight: 1, cursor: "default", flexShrink: 0 }}>✨</span>
+      </Tooltip>
+    );
+    return null;
+  };
+
+  // Click stat with mini bar
+  const ClickStat = ({ clicks, isTop }) => {
+    if (clicks == null) return null;
+    const pct = Math.round((clicks / maxClicks) * 100);
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, minWidth: 80 }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: tokens.grayLight, overflow: "hidden", flexShrink: 0 }}>
+          <div style={{ height: 4, width: `${pct}%`, borderRadius: 2, background: isTop ? tokens.green : tokens.purpleMid }} />
+        </div>
+        <span style={{ fontSize: 11, color: isTop ? tokens.green : tokens.textMuted, fontWeight: isTop ? 600 : 400, whiteSpace: "nowrap" }}>
+          {clicks >= 1000 ? `${(clicks / 1000).toFixed(1)}k` : clicks}
+        </span>
+        {isTop && (
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5 6.5 5 8 2z" fill={tokens.green}/>
+          </svg>
+        )}
+      </div>
+    );
+  };
+
+  const isSkillCard = filterType === "skill";
+  const isFlowCard = filterType === "flow";
+  const cardTitle = title || (isSkillCard ? "Skill prompts" : isFlowCard ? "Flows" : "Conversation starters");
+  const cardDescription = description || (
+    isSkillCard
+      ? "Starters that trigger your AI Agent Skills. Shopper taps, Agent resolves end-to-end."
+      : isFlowCard
+        ? "Legacy Flow-based starters. Flows run a hardcoded path — they don't trigger AI Agent."
+        : "Help shoppers get answers faster. Skill-linked starters trigger the AI Agent automatically."
+  );
+
+  return (
+    <div style={{ background: tokens.bgWhite, borderRadius: 12, border: `1px solid ${tokens.border}`, padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {isSkillCard && (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.9"/>
+            </svg>
+          )}
+          {isFlowCard && (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M3 6h3a2 2 0 012 2v8a2 2 0 002 2h3" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+              <path d="M21 18h-3a2 2 0 01-2-2V8a2 2 0 00-2-2H11" stroke={tokens.yellow} strokeWidth="1.7" strokeLinecap="round"/>
+              <circle cx="3" cy="6" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
+              <circle cx="21" cy="18" r="2" stroke={tokens.yellow} strokeWidth="1.7"/>
+            </svg>
+          )}
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: tokens.text, margin: 0 }}>{cardTitle}</h3>
+          {isFlowCard && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
+              background: "#FEF3C7", color: "#92400E", letterSpacing: "0.02em",
+            }}>LEGACY</span>
+          )}
+        </div>
+        <Toggle enabled={enabled} onToggle={() => setEnabled(!enabled)} />
+      </div>
+      <p style={{ fontSize: 14, color: tokens.textSecondary, margin: "0 0 16px", lineHeight: 1.5 }}>
+        {cardDescription}
+      </p>
+
+      {/* ── Flows deprecation callout (only on Flows card) ── */}
+      {enabled && displayedStarters.some(s => s.type === "flow") && (
+        <div style={{
+          padding: "12px 16px", background: "#FFF7ED", borderRadius: 10,
+          border: "1px solid #FDBA74", marginBottom: 16,
+          display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ marginTop: 1, flexShrink: 0 }}>
+            <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill="#EA580C" opacity="0.8"/>
+          </svg>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#9A3412", marginBottom: 3 }}>
+              Resolve more with AI Agent
+            </div>
+            <div style={{ fontSize: 12, color: "#9A3412", lineHeight: 1.5 }}>
+              AI Agent handles conversations end-to-end with higher resolution rates than static Flows. We'll progressively help you transition your existing Flows to Skill-linked starters that trigger AI Agent — look for recommendations below. New Flows can no longer be created, but you can still edit existing ones.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {enabled && displayedStarters.length === 0 && (
+        <div style={{
+          padding: "20px 16px", borderRadius: 10, background: tokens.grayLight,
+          border: `1px dashed ${tokens.border}`, textAlign: "center",
+          fontSize: 13, color: tokens.textMuted,
+        }}>
+          No conversation starters yet. Add one below — from a Skill, written manually, or from AI recommendations.
+        </div>
+      )}
+
+      {enabled && (
+        <>
+          {displayedStarters.map((starter, i) => {
+            const isEditing = starter.editing;
+            const isDragTarget = dragOverIdx === i && dragIdx !== i;
+            return (
+              <div key={i}>
+                <div
+                  draggable={!isEditing}
+                  onDragStart={() => handleDragStart(i)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDrop={() => handleDrop(i)}
+                  onDragEnd={handleDragEnd}
+                  style={{ opacity: dragIdx === i ? 0.4 : 1, transition: "opacity 0.15s" }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                    borderBottom: i < displayedStarters.length - 1 ? `1px solid ${tokens.grayLight}` : "none",
+                    borderTop: isDragTarget ? `2px solid ${tokens.accent}` : "2px solid transparent",
+                    position: "relative",
+                  }}>
+                    <DragDots />
+                    {/* Type indicator */}
+                    <TypeBadge type={starter.type} skillName={starter.skillName} />
+                    {starter.type === "flow" && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 8, background: "#FEF3C7", color: "#92400E", letterSpacing: "0.02em", flexShrink: 0 }}>LEGACY</span>
+                    )}
+                    {/* Text — editable for skills (renamable) */}
+                    {isEditing ? (
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <input type="text" value={starter.text}
+                          onChange={(e) => updateText(i, e.target.value)}
+                          placeholder={starter.type === "skill" ? "Rename this starter..." : "e.g. Where is my order?"}
+                          maxLength={80}
+                          autoFocus
+                          style={{
+                            flex: 1, padding: "8px 12px", border: `1px solid ${tokens.accent}`,
+                            borderRadius: 8, fontSize: 14, color: tokens.text,
+                            background: tokens.bgWhite, outline: "none", fontFamily: "inherit",
+                          }}
+                          onBlur={() => { if (starter.text.trim()) toggleEditing(i); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" && starter.text.trim()) toggleEditing(i); }}
+                        />
+                        {starter.type === "skill" && (
+                          <div style={{ fontSize: 11, color: tokens.textMuted, paddingLeft: 2 }}>
+                            Linked to: <span style={{ color: tokens.purple, fontWeight: 500 }}>{starter.skillName}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ flex: 1, fontSize: 14, color: starter.text ? tokens.text : tokens.textMuted, lineHeight: 1.4 }}>
+                        {starter.text || "Empty starter"}
+                      </span>
+                    )}
+                    {/* Click stats */}
+                    {starter.clicks != null && !isEditing && (
+                      <Tooltip text={`${starter.clicks} clicks in the last 30 days`} width={160}>
+                        <ClickStat clicks={starter.clicks} isTop={starter.clicks === maxClicks} />
+                      </Tooltip>
+                    )}
+                    {/* Action buttons */}
+                    {!isEditing && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                        {/* Rename (pencil) — skill, custom, and AI starters */}
+                        {starter.type !== "flow" && (
+                          <button onClick={() => handleEdit(i)}
+                            title="Rename"
+                            style={{
+                              width: 30, height: 30, borderRadius: 6, border: "none",
+                              background: "transparent", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        )}
+                        {/* Go to Skill page — for skills */}
+                        {starter.type === "skill" && (
+                          <button
+                            title="Go to Skill"
+                            style={{
+                              width: 30, height: 30, borderRadius: 6, border: "none",
+                              background: "transparent", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M15 3h6v6M10 14L21 3" stroke={tokens.purple} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        )}
+                        {/* Open flow editor — for flows */}
+                        {starter.type === "flow" && (
+                          <button onClick={() => handleEdit(i)}
+                            title="Edit flow"
+                            style={{
+                              width: 30, height: 30, borderRadius: 6, border: "none",
+                              background: "transparent", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M15 3h6v6M10 14L21 3" stroke={tokens.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {/* Remove */}
+                    <button onClick={() => removeStarter(i)} style={{
+                      width: 30, height: 30, borderRadius: 6, border: "none",
+                      background: "transparent", cursor: "pointer", color: tokens.textMuted,
+                      fontSize: 18, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = tokens.grayLight}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>&times;</button>
+                  </div>
+                </div>
+                {/* Flow migration nudge — shown below each flow row */}
+                {starter.type === "flow" && (
+                  <FlowMigrationNudge flowName={starter.text} onNavigate={onNavigate} />
+                )}
+              </div>
+            );
+          })}
+
+          {/* AI recommendations — mined from ticket history */}
+          {recs.length > 0 && (
+            <div style={{
+              marginTop: 16, borderRadius: 10, overflow: "hidden",
+              border: `1px solid ${recsPulse ? tokens.green : tokens.border}`,
+              boxShadow: recsPulse ? `0 0 0 3px ${tokens.greenLight}` : "none",
+              transition: "border-color 0.3s, box-shadow 0.3s",
+            }}>
+              <div style={{ padding: "10px 14px", background: "#F6FDF9", borderBottom: `1px solid ${tokens.grayLight}`, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12 }}>✨</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: tokens.text }}>Recommended from your tickets</span>
+                <span style={{ fontSize: 11, color: tokens.textMuted }}>Top questions AI Agent already automates well · last 90 days</span>
+              </div>
+              {recs.map((rec, ri) => (
+                <div key={rec.text} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: ri < recs.length - 1 ? `1px solid ${tokens.grayLight}` : "none" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: tokens.text, fontWeight: 500 }}>{rec.text}</div>
+                    <div style={{ fontSize: 11, color: tokens.textMuted, marginTop: 1 }}>
+                      {rec.intent} · {rec.tickets} tickets · <span style={{ color: tokens.green, fontWeight: 600 }}>{rec.automation}% automated</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setRecs(recs.filter(r => r.text !== rec.text))} style={{ border: "none", background: "none", fontSize: 11, color: tokens.textMuted, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>Dismiss</button>
+                  <button onClick={() => handleAddRecommendation(rec)} style={{ padding: "4px 12px", fontSize: 12, fontWeight: 600, border: `1px solid ${tokens.green}`, borderRadius: 6, background: tokens.bgWhite, color: tokens.green, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>+ Add</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Bottom action — unified Add starter menu (in-card) */}
+          {starters.length < MAX_STARTERS && (
+            <div style={{ marginTop: 14, position: "relative" }}>
+              <button onClick={() => setShowAddMenu(!showAddMenu)}
+                style={{
+                  padding: "8px 16px", borderRadius: 8, border: `1px solid ${tokens.accent}`,
+                  background: tokens.purpleLight, fontSize: 13, fontWeight: 600, color: tokens.purple,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                }}>
+                + Add starter
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" style={{ transform: showAddMenu ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {showAddMenu && (
+                <>
+                  <div onClick={() => setShowAddMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 49 }} />
+                  <div style={{
+                    position: "absolute", bottom: "calc(100% + 6px)", left: 0, width: 320,
+                    background: tokens.bgWhite, border: `1px solid ${tokens.border}`,
+                    borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 50, overflow: "hidden",
+                  }}>
+                    {[
+                      {
+                        label: "From a Skill",
+                        desc: "Pre-filled phrase backed by a Skill — best resolution rate",
+                        iconBg: tokens.purpleLight,
+                        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.9"/></svg>,
+                        onClick: () => { setShowAddMenu(false); setShowSkillPicker(true); },
+                      },
+                      {
+                        label: "Write your own",
+                        desc: "Free text — AI Agent answers from your knowledge",
+                        iconBg: tokens.blueLight,
+                        icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={tokens.blue} strokeWidth="1.7" strokeLinecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={tokens.blue} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+                        onClick: handleAddCustom,
+                      },
+                      {
+                        label: "AI recommended",
+                        desc: "From your most-asked, well-automated ticket questions",
+                        iconBg: tokens.greenLight,
+                        icon: <span style={{ fontSize: 12, lineHeight: 1 }}>✨</span>,
+                        onClick: pulseRecs,
+                      },
+                    ].map((item, mi) => (
+                      <div key={item.label} onClick={item.onClick}
+                        style={{
+                          display: "flex", gap: 12, padding: "11px 14px", cursor: "pointer", alignItems: "flex-start",
+                          borderBottom: mi < 2 ? `1px solid ${tokens.grayLight}` : "none",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = tokens.bgPage}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <div style={{ width: 28, height: 28, borderRadius: 8, background: item.iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>{item.icon}</div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>{item.label}</div>
+                          <div style={{ fontSize: 11, color: tokens.textMuted, marginTop: 2, lineHeight: 1.4 }}>{item.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          <div style={{ marginTop: 8, fontSize: 12, color: tokens.textMuted }}>
+            {starters.length} / {MAX_STARTERS} starters total
+          </div>
+        </>
+      )}
+
+      {/* Skill Picker Modal */}
+      <SkillPickerModal
+        open={showSkillPicker}
+        onClose={() => setShowSkillPicker(false)}
+        onSelect={handleAddFromSkill}
+        existingSkillNames={existingSkillNames}
+      />
+
+      {/* Flow Editor Modal */}
+      {flowEditorIdx !== null && (() => {
+        const flowName = starters[flowEditorIdx]?.text || "Untitled Flow";
+        return (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.45)", zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }} onClick={() => setFlowEditorIdx(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "85vw", height: "80vh", maxWidth: 1100,
+            background: tokens.bgWhite, borderRadius: 16,
+            boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+            display: "flex", flexDirection: "column", overflow: "hidden",
+          }}>
+            {/* Top bar */}
+            <div style={{ borderBottom: `1px solid ${tokens.border}`, background: tokens.bgWhite }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button onClick={() => setFlowEditorIdx(null)} style={{
+                    background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6,
+                    fontSize: 14, fontWeight: 600, color: tokens.text,
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke={tokens.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Flows
+                  </button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Read-only notice */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 6, background: "#FEF3C7", border: "1px solid #FDE68A", fontSize: 11, fontWeight: 600, color: "#92400E" }}>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="8" r="6" stroke="#D97706" strokeWidth="1.3"/>
+                      <path d="M8 5v3M8 10v.5" stroke="#D97706" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                    Edit only — try AI Agent for better results
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: `1px solid ${tokens.border}`, fontSize: 13, fontWeight: 500, color: tokens.text, cursor: "pointer", background: tokens.bgWhite }}>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2l6.93 4v8L8 18 1.07 14V6L8 2z" stroke={tokens.text} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" fill={tokens.text}/></svg>
+                    English - US
+                  </div>
+                  <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, fontSize: 13, fontWeight: 600, color: tokens.text, cursor: "pointer" }}>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-6" stroke={tokens.green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Test
+                  </button>
+                  <button style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.textMuted, cursor: "default", opacity: 0.5 }}>Discard Changes</button>
+                  <button style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.textMuted, cursor: "default", opacity: 0.5 }}>Publish</button>
+                </div>
+              </div>
+              {/* Flow name + tabs */}
+              <div style={{ padding: "0 20px" }}>
+                <input value={flowName} readOnly style={{ fontSize: 18, fontWeight: 600, color: tokens.text, border: "none", outline: "none", padding: "4px 0", background: "transparent", width: "100%", fontFamily: "inherit" }} />
+                <div style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 10 }}>Flow name will not be visible to customers</div>
+                <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${tokens.border}`, marginBottom: -1 }}>
+                  {["Configuration", "Channels"].map((tab, ti) => (
+                    <button key={tab} style={{
+                      padding: "8px 16px", background: "none", border: "none", cursor: "pointer",
+                      fontSize: 13, fontWeight: ti === 0 ? 600 : 400,
+                      color: ti === 0 ? tokens.text : tokens.textSecondary,
+                      borderBottom: ti === 0 ? `2px solid ${tokens.text}` : "2px solid transparent", marginBottom: -1,
+                    }}>{tab}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Canvas area */}
+            <div style={{ flex: 1, background: tokens.bgPage, position: "relative", overflow: "hidden" }}>
+              {/* Editor/Analysis toggle */}
+              <div style={{ position: "absolute", top: 16, right: 20, display: "flex", borderRadius: 8, border: `1px solid ${tokens.border}`, overflow: "hidden", zIndex: 5 }}>
+                {["Editor", "Analysis"].map((t, ti) => (
+                  <button key={t} style={{
+                    padding: "6px 16px", border: "none", fontSize: 13, fontWeight: ti === 0 ? 600 : 400, cursor: "pointer",
+                    background: ti === 0 ? tokens.bgWhite : "transparent",
+                    color: ti === 0 ? tokens.text : tokens.textSecondary,
+                  }}>{t}</button>
+                ))}
+              </div>
+
+              {/* Zoom controls */}
+              <div style={{ position: "absolute", top: 16, left: 20, display: "flex", flexDirection: "column", gap: 4, zIndex: 5 }}>
+                {["+", "\u2212", "\u2922"].map((sym, si) => (
+                  <div key={si} style={{
+                    width: 32, height: 32, borderRadius: 6, border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                    fontSize: 16, color: tokens.textSecondary, fontWeight: 300,
+                  }}>{sym}</div>
+                ))}
+              </div>
+
+              {/* Minimap */}
+              <div style={{ position: "absolute", bottom: 16, left: 20, width: 140, height: 90, borderRadius: 8, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, padding: 8, zIndex: 5 }}>
+                <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                  {[1, 2, 3].map(i => <div key={i} style={{ width: 40, height: 6, borderRadius: 2, background: tokens.grayLight }} />)}
+                </div>
+              </div>
+
+              {/* Flow nodes — centered vertical chain */}
+              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                {/* START node */}
+                <div style={{
+                  padding: "16px 40px", borderRadius: 10, border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)", textAlign: "center", minWidth: 220,
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: tokens.textSecondary, letterSpacing: "0.05em", marginBottom: 4 }}>START</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text }}>{flowName}</div>
+                </div>
+
+                {/* Connector */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ width: 1, height: 24, background: tokens.border }} />
+                  <div style={{ width: 20, height: 20, borderRadius: 10, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: tokens.textMuted, cursor: "pointer" }}>+</div>
+                  <div style={{ width: 1, height: 24, background: tokens.border }} />
+                </div>
+
+                {/* Automated answer node */}
+                <div style={{
+                  padding: "14px 20px", borderRadius: 10, border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)", minWidth: 220, position: "relative",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, background: tokens.accent }} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: tokens.accent }}>Automated answer</span>
+                    <div style={{ marginLeft: "auto", width: 20, height: 20, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: tokens.textMuted }}>
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1m2 0v9a1 1 0 01-1 1H4a1 1 0 01-1-1V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13, color: tokens.text, lineHeight: 1.45 }}>Hi! Our Customer Care Team is offline for the Thanksgiving holiday...</div>
+                </div>
+
+                {/* Connector */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ width: 1, height: 24, background: tokens.border }} />
+                  <div style={{ width: 20, height: 20, borderRadius: 10, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: tokens.textMuted, cursor: "pointer" }}>+</div>
+                  <div style={{ width: 1, height: 24, background: tokens.border }} />
+                </div>
+
+                {/* END node */}
+                <div style={{
+                  padding: "14px 40px", borderRadius: 10, border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)", textAlign: "center", minWidth: 220,
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: tokens.textSecondary, letterSpacing: "0.05em", marginBottom: 4 }}>END</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 13, color: tokens.text }}>
+                    <span style={{ fontSize: 14 }}>👍</span> Ask for feedback
+                  </div>
+                </div>
+              </div>
+
+              {/* Last saved timestamp */}
+              <div style={{ position: "absolute", top: 16, right: 200, fontSize: 12, color: tokens.textMuted, zIndex: 5 }}>
+                Last saved Nov 26 at 5:34 pm
+              </div>
+            </div>
+          </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// ORDER MANAGEMENT CARD
+// ════════════════════════════════════════════════════════════════
+function OrderManagementCard() {
+  const [enabled, setEnabled] = useState(true);
+  return (
+    <div style={{ background: tokens.bgWhite, borderRadius: 12, border: `1px solid ${tokens.border}`, padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: tokens.text, margin: 0 }}>Order management</h3>
+        <Toggle enabled={enabled} onToggle={() => setEnabled(!enabled)} />
+      </div>
+      <p style={{ fontSize: 14, color: tokens.textSecondary, margin: "0 0 16px" }}>Let customers sign in to track, return, cancel or report issues with orders.</p>
+      <button style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${tokens.border}`, background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.text, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke={tokens.textSecondary} strokeWidth="1.5" strokeLinecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke={tokens.textSecondary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        Edit order management
+      </button>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// CHAT PREVIEW — FIXED SIZE, scrollable
+// ════════════════════════════════════════════════════════════════
+function ChatPreview({ starters, enabled }) {
+  const [messages, setMessages] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const messagesEndRef = useRef(null);
+  const activeStarters = enabled ? starters.filter((s) => s.text.trim() !== "") : [];
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
+
+  const simulateAiResponse = (userMessage) => {
+    setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      const responses = { "Where is my order?": "I can help you track your order! Could you share your order number or the email address you used at checkout?", "I want to return or exchange an item": "We offer a 30-day hassle-free return policy on all unworn items. Simply start a return from your order page and we'll email you a prepaid shipping label.", "I need to cancel my order": "I can help you cancel your order! Let me check the status. What's your order number?", "I received a damaged item": "I'm sorry to hear your item arrived damaged. We'll make it right! Could you share your order number so I can help?", "Do you have any discounts right now?": "Yes! We currently have 15% off sitewide with code SUMMER15, and free shipping on orders over $50.", "Do you ship internationally?": "We ship to over 40 countries! Shipping rates and delivery times vary by destination — where would you like your order delivered?", "How do I apply my discount code?": "Easy! At checkout, paste your code in the Discount code field and hit Apply. Want me to check if your code is still valid?", "Can I change my delivery address?": "I can help with that! If your order hasn't shipped yet, I can update the address right away. What's your order number?" };
+      setMessages((prev) => [...prev, { role: "ai", text: responses[userMessage] || "Great question! Let me look into that for you." }]);
+    }, 1800);
+  };
+  const handleReset = () => { setMessages([]); setIsTyping(false); setInputValue(""); };
+  const showHome = messages.length === 0;
+
+  return (
+    <div style={{
+      width: 380, flexShrink: 0,
+      background: tokens.bgPage,
+      display: "flex", flexDirection: "column",
+      borderLeft: `1px solid ${tokens.border}`,
+      height: "100%",
+      overflow: "hidden",
+    }}>
+      <div style={{ padding: "10px 16px", borderBottom: `1px solid ${tokens.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: tokens.bgWhite, flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textSecondary }}>Chat preview</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[<svg key="h" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M3 10.5L12 3l9 7.5V21H15v-5h-6v5H3V10.5z" stroke={tokens.textSecondary} strokeWidth="1.7" strokeLinejoin="round"/></svg>,
+            <svg key="r" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke={tokens.textSecondary} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke={tokens.textSecondary} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          ].map((icon, i) => (
+            <div key={i} onClick={handleReset} style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${tokens.border}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: tokens.bgWhite }}>{icon}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Fixed-size chat widget container — centered with fixed dimensions */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        overflow: "auto",
+      }}>
+        <div style={{
+          width: 340,
+          height: 520,
+          minHeight: 520,
+          maxHeight: 520,
+          borderRadius: 16,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          background: tokens.bgWhite,
+          border: `1px solid ${tokens.border}`,
+          flexShrink: 0,
+        }}>
+          {showHome ? (
+            <>
+              <div style={{ background: brandBgGradient, position: "relative", display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px 0", flexShrink: 0 }}>
+                  <div style={{ width: 28 }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 16, background: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500, color: "#fff", cursor: "pointer" }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><circle cx="20" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                      Track orders
+                    </div>
+                    <div style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: "#fff" }}>&times;</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 20px 10px", flexShrink: 0 }}>
+                  <div style={{ fontSize: 38, fontWeight: 900, color: "#fff", fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", letterSpacing: "-0.03em", lineHeight: 1 }}>Wilson</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 6, textAlign: "center", lineHeight: 1.4 }}>This chat is AI-powered for faster assistance.</div>
+                </div>
+                <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", flex: 1 }}>
+                  {activeStarters.map((starter, i) => (
+                    <button key={i} onClick={() => simulateAiResponse(starter.text)} style={{
+                      padding: "9px 14px", borderRadius: 20, border: "none",
+                      background: "rgba(255,255,255,0.20)", fontSize: 12, fontWeight: 500,
+                      color: "#fff", cursor: "pointer", textAlign: "left",
+                      display: "inline-flex", alignItems: "center", gap: 5, width: "auto", alignSelf: "flex-start",
+                      flexShrink: 0,
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.35)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.20)"; }}>
+                      {starter.text}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ padding: "10px 14px 14px", flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderRadius: 22, background: "rgba(255,255,255,0.20)" }}>
+                    <span style={{ fontSize: 14, color: "rgba(255,255,255,0.6)" }}>Ask anything</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ background: brandBgGradient, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div onClick={handleReset} style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic" }}>Wilson</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 16, background: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500, color: "#fff" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><circle cx="20" cy="21" r="1" stroke="#fff" strokeWidth="1.8"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    Track orders
+                  </div>
+                  <div style={{ width: 28, height: 28, borderRadius: 14, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: "#fff" }}>&times;</div>
+                </div>
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px", background: tokens.bgWhite }}>
+                {messages.map((msg, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 10, animation: "fadeIn 0.25s ease-out" }}>
+                    {msg.role === "ai" && <div style={{ width: 26, height: 26, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg, ${brandColor}, #E06070)`, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, marginTop: 2 }}><span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>AI</span></div>}
+                    <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: msg.role === "user" ? "#F3F4F6" : "#F9FAFB", border: msg.role === "user" ? "none" : `1px solid ${tokens.grayLight}`, color: tokens.text, fontSize: 13, lineHeight: 1.55 }}>{msg.text}</div>
+                  </div>
+                ))}
+                {isTyping && (
+                  <div style={{ display: "flex", alignItems: "flex-start", animation: "fadeIn 0.3s ease-out" }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 13, flexShrink: 0, background: `linear-gradient(135deg, ${brandColor}, #E06070)`, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 8, marginTop: 2 }}><span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>AI</span></div>
+                    <div style={{ padding: "10px 14px", borderRadius: "16px 16px 16px 4px", background: "#F9FAFB", border: `1px solid ${tokens.grayLight}`, display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 16, height: 16, border: `2px solid ${tokens.border}`, borderTopColor: brandColor, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                      <span style={{ fontSize: 13, color: tokens.textSecondary }}>Gathering details</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+              <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${tokens.grayLight}`, background: tokens.bgWhite, flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 22, border: `1.5px solid ${tokens.border}` }}>
+                  <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && inputValue.trim() && !isTyping) { simulateAiResponse(inputValue.trim()); setInputValue(""); } }} placeholder="Reply" style={{ flex: 1, padding: "2px 0", border: "none", fontSize: 14, color: tokens.text, outline: "none", background: "transparent", fontFamily: "inherit" }} />
+                  <div onClick={() => { if (inputValue.trim() && !isTyping) { simulateAiResponse(inputValue.trim()); setInputValue(""); } }} style={{ width: 28, height: 28, borderRadius: 14, background: inputValue.trim() ? brandColor : tokens.grayLight, display: "flex", alignItems: "center", justifyContent: "center", cursor: inputValue.trim() ? "pointer" : "default", flexShrink: 0 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke={inputValue.trim() ? "#fff" : tokens.textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      <div style={{ textAlign: "center", padding: "6px 0 10px", fontSize: 10, color: tokens.textMuted, flexShrink: 0 }}>Powered by <span style={{ fontWeight: 600 }}>Gorgias</span></div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// SUPPORT ACTIONS PAGE (static, matches real Gorgias screenshot)
+// ════════════════════════════════════════════════════════════════
+const supportActionTemplates = [
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Cancel order" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Get order info" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Refund shipping costs" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Remove item" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Replace item" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Reship order for free" },
+  { category: "Orders", color: "#059669", bgColor: "#D1FAE5", name: "Update shipping address" },
+  { category: "Returns & Exchanges", color: "#DC2626", bgColor: "#FEE2E2", name: "Send return portal link" },
+  { category: "Returns & Exchanges", color: "#DC2626", bgColor: "#FEE2E2", name: "Send return shipping status" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Cancel subscription" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Pause subscription" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Resume subscription" },
+  { category: "Subscriptions", color: "#D97706", bgColor: "#FEF3C7", name: "Skip next subscription shipment" },
+  { category: "Marketing", color: "#7C3AED", bgColor: "#EDE9FE", name: "Unsubscribe from mailing list" },
+];
+
+function SupportActionsPage({ onBack }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${tokens.border}` }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: tokens.text }}>Support Actions</span>
+        <button style={{
+          padding: "7px 14px", borderRadius: 8, border: `1px solid ${tokens.border}`,
+          background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.text, cursor: "pointer",
+        }}>Test</button>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        {/* Back link */}
+        <div onClick={onBack} style={{
+          display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: tokens.textSecondary,
+          cursor: "pointer", marginBottom: 20,
+        }}
+          onMouseEnter={e => e.currentTarget.style.color = tokens.text}
+          onMouseLeave={e => e.currentTarget.style.color = tokens.textSecondary}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          Back to Support Actions
+        </div>
+
+        {/* Title + action */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: tokens.text }}>Choose a template and customize it to fit your needs</span>
+          <button style={{
+            padding: "8px 16px", borderRadius: 8, border: `1px solid ${tokens.border}`,
+            background: tokens.bgWhite, fontSize: 13, fontWeight: 500, color: tokens.text, cursor: "pointer",
+          }}>Create Custom Action</button>
+        </div>
+
+        {/* Card grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+          {supportActionTemplates.map((tpl, i) => (
+            <div key={i} style={{
+              padding: "20px 20px 40px", borderRadius: 12, border: `1px solid ${tokens.border}`,
+              background: tokens.bgWhite, cursor: "pointer",
+              transition: "box-shadow 0.15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 4,
+                background: tpl.bgColor, color: tpl.color, display: "inline-block", marginBottom: 12,
+              }}>{tpl.category}</span>
+              <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>{tpl.name}</div>
+            </div>
+          ))}
+          {/* Create custom action card */}
+          <div style={{
+            padding: "20px 20px 40px", borderRadius: 12, border: `1px dashed ${tokens.border}`,
+            background: tokens.bgWhite, cursor: "pointer",
+            display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center",
+          }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = tokens.textMuted}
+            onMouseLeave={e => e.currentTarget.style.borderColor = tokens.border}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 14, background: tokens.grayLight,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 12, fontSize: 18, color: tokens.textMuted,
+            }}>+</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>Create custom Action</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// SHOPPING ASSISTANT PAGE (static placeholder)
+// ════════════════════════════════════════════════════════════════
+function ShoppingAssistantPage({ onBack }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${tokens.border}` }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: tokens.text }}>Shopping Assistant</span>
+        <Toggle enabled={true} />
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        {/* Back link */}
+        <div onClick={onBack} style={{
+          display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: tokens.textSecondary,
+          cursor: "pointer", marginBottom: 24,
+        }}
+          onMouseEnter={e => e.currentTarget.style.color = tokens.text}
+          onMouseLeave={e => e.currentTarget.style.color = tokens.textSecondary}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          Back to Chat Settings
+        </div>
+
+        {/* Info banner */}
+        <div style={{
+          padding: "16px 20px", background: tokens.purpleLight, borderRadius: 12,
+          border: "1px solid #DDD6FE", marginBottom: 24,
+          display: "flex", alignItems: "flex-start", gap: 12,
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+            <path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5L12 2z" fill={tokens.purple} opacity="0.8"/>
+          </svg>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#5B21B6", marginBottom: 4 }}>Shopping Assistant helps shoppers find the right product</div>
+            <div style={{ fontSize: 13, color: "#6D28D9", lineHeight: 1.5 }}>
+              It uses your product catalog, brand guidelines, and customer preferences to recommend products through natural conversation. Configure it here to replace product-finder Flows with a smarter, AI-powered experience.
+            </div>
+          </div>
+        </div>
+
+        {/* Settings cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 680 }}>
+          {[
+            { title: "Product catalog", desc: "Connected to your Shopify catalog. 1,247 products synced.", status: "Connected" },
+            { title: "Brand voice", desc: "Define how the assistant talks about your products — tone, vocabulary, key selling points.", status: "Configured" },
+            { title: "Recommendation rules", desc: "Set logic for how products are suggested — by bestsellers, margin, availability, or custom rules.", status: "3 rules active" },
+          ].map((card, i) => (
+            <div key={i} style={{
+              padding: 20, borderRadius: 12, border: `1px solid ${tokens.border}`, background: tokens.bgWhite,
+              display: "flex", alignItems: "center", gap: 16,
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>{card.title}</div>
+                <div style={{ fontSize: 13, color: tokens.textSecondary, lineHeight: 1.4 }}>{card.desc}</div>
+              </div>
+              <span style={{
+                fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: 6,
+                background: tokens.greenLight, color: tokens.green, flexShrink: 0,
+              }}>{card.status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// SETTINGS PAGE CONTENT (Chat settings under Deploy > Chat)
+// ════════════════════════════════════════════════════════════════
+function SettingsContent({ starters, setStarters, startersEnabled, setStartersEnabled, onNavigate }) {
+  const [activeTab, setActiveTab] = useState("automation");
+  const tabs = [
+    { id: "appearance", label: "Appearance" },
+    { id: "preferences", label: "Preferences" },
+    { id: "automation", label: "Automation" },
+    { id: "language", label: "Language" },
+    { id: "installation", label: "Installation" },
+  ];
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Breadcrumb */}
+      <div style={{ padding: "12px 24px 0", fontSize: 13, color: tokens.textSecondary }}>
+        <span style={{ cursor: "pointer" }}>All chats</span>
+        <span style={{ margin: "0 6px", color: tokens.textMuted }}>&rsaquo;</span>
+        <span>Sol de Janeiro Support</span>
+      </div>
+
+      {/* Page header */}
+      <div style={{ padding: "12px 24px 0", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${tokens.border}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: tokens.bgWhite }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke={tokens.text} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </div>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: tokens.text, margin: 0 }}>Settings</h1>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ padding: "0 24px", borderBottom: `1px solid ${tokens.border}`, display: "flex", gap: 0, marginTop: 16 }}>
+        {tabs.map((tab) => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+            padding: "12px 16px", background: "none", border: "none", cursor: "pointer",
+            fontSize: 13,
+            fontWeight: activeTab === tab.id ? 600 : 400,
+            color: activeTab === tab.id ? tokens.accent : tokens.textSecondary,
+            borderBottom: activeTab === tab.id ? `2px solid ${tokens.accent}` : "2px solid transparent",
+            marginBottom: -1,
+            transition: "color 0.1s",
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Scrollable content */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {activeTab === "automation" ? (
+          <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20, maxWidth: 680 }}>
+            <ConversationStartersCard
+              starters={starters}
+              setStarters={setStarters}
+              enabled={startersEnabled}
+              setEnabled={setStartersEnabled}
+              onNavigate={onNavigate}
+              title="Conversation starters"
+              description="What shoppers see when they open chat. Starters can be linked to Skills, written manually, or suggested from your ticket history — legacy Flows are progressively being replaced."
+            />
+            <OrderManagementCard />
+          </div>
+        ) : (
+          <div style={{ padding: "60px 24px", textAlign: "center", color: tokens.textMuted, fontSize: 14 }}>
+            {tabs.find(t => t.id === activeTab)?.label} settings would appear here
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN APP — with page-level navigation
+// ════════════════════════════════════════════════════════════════
+function ConversationStartersUnifiedPrototype() {
+  const [starters, setStarters] = useState([
+    { text: "Where is my order?", type: "skill", skillName: "Order status, tracking or delivery timing", editing: false, clicks: 2847 },
+    { text: "I want to return or exchange an item", type: "skill", skillName: "Return, exchange or refund status", editing: false, clicks: 1523 },
+    { text: "I need to cancel my order", type: "skill", skillName: "Order cancellation", editing: false, clicks: 891 },
+    { text: "I received a damaged item", type: "skill", skillName: "Damaged, defective or broken item", editing: false, clicks: 412 },
+    { text: "Tennis Racket Finder", type: "flow", editing: false, clicks: 482 },
+    { text: "I need to manage my subscription", type: "flow", editing: false, clicks: 203 },
+    { text: "Do you have any discounts right now?", type: "custom", editing: false, clicks: 289 },
+  ]);
+  const [startersEnabled, setStartersEnabled] = useState(true);
+  // Page navigation: "chat-settings" | "support-actions" | "shopping-assistant"
+  const [activePage, setActivePage] = useState("chat-settings");
+
+  // Build nav config dynamically based on active page
+  const getNavConfig = () => {
+    const base = {
+      title: "AI Agent",
+      storeName: "one-bone",
+      sections: [
+        {
+          label: "Analyze",
+          items: [
+            { label: "Overview" },
+            { label: "Intents" },
+            { label: "Opportunities", badge: "Beta", count: 30 },
+          ],
+        },
+        {
+          label: "Train",
+          items: [
+            { label: "Knowledge" },
+            { label: "Support Actions", isActive: activePage === "support-actions" },
+            { label: "Products" },
+            { label: "Shopping Assistant", isActive: activePage === "shopping-assistant" },
+          ],
+        },
+        { topItem: "Test" },
+        {
+          label: "Deploy",
+          items: [
+            { label: "Chat", isActive: activePage === "chat-settings", dot: true },
+            { label: "Email", dot: true },
+            { label: "SMS", dot: true },
+          ],
+        },
+        { topItem: "Settings" },
+      ],
+    };
+    return base;
+  };
+
+  const handleNavigate = (target) => {
+    if (target === "Support Actions") setActivePage("support-actions");
+    else if (target === "Shopping Assistant") setActivePage("shopping-assistant");
+  };
+
+  const handleNavItemClick = (label) => {
+    if (label === "Support Actions") setActivePage("support-actions");
+    else if (label === "Shopping Assistant") setActivePage("shopping-assistant");
+    else if (label === "Chat") setActivePage("chat-settings");
+  };
+
+  // Render content based on active page
+  const renderContent = () => {
+    if (activePage === "support-actions") {
+      return <SupportActionsPage onBack={() => setActivePage("chat-settings")} />;
+    }
+    if (activePage === "shopping-assistant") {
+      return <ShoppingAssistantPage onBack={() => setActivePage("chat-settings")} />;
+    }
+    const previewStarters = starters;
+    const anyEnabled = startersEnabled;
+    return (
+      <>
+        <SettingsContent
+          starters={starters}
+          setStarters={setStarters}
+          startersEnabled={startersEnabled}
+          setStartersEnabled={setStartersEnabled}
+          onNavigate={handleNavigate}
+        />
+        <ChatPreview
+          starters={previewStarters}
+          enabled={anyEnabled}
+        />
+      </>
+    );
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        input:focus { outline: none; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+      `}</style>
+      <div style={css.page}>
+        <div style={{ display: "flex", flexShrink: 0, height: "100%" }}>
+          <IconRail activeId="ai-agent" />
+          <NavPanel config={getNavConfig()} onItemClick={handleNavItemClick} />
+        </div>
+        <div style={{ ...css.contentContainer, flexDirection: "row" }}>
+          {renderContent()}
+        </div>
+      </div>
+    </>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(ConversationStartersUnifiedPrototype));
+  
+  </script>
+</body>
+</html>

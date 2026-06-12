@@ -6,7 +6,28 @@ Interactive UI prototypes for Gorgias product features. Open any `.html` file di
 
 ---
 
-## Agent Behavior — Scope (NEW)
+## Unified Conversation Starters (NEW)
+
+**Files:** `conversation-starters-unified.html` / `conversation-starters-unified.jsx`
+
+V2 of the skill-linked starters prototype, reworked after Max's feedback (June 9 1:1): one unified list instead of separate Skill prompts / Flows cards. Starters are one object with four origins — Skill-linked, legacy Flow, hand-written, AI-recommended — and the origin is invisible to shoppers.
+
+### What's in the prototype
+
+- **Single "Conversation starters" card** under Chat settings → Automation, one toggle, one drag-to-reorder list, 8-starter cap
+- **Four starter types** with icon + tooltip per row: skill (purple star, renamable, link to Skill page), flow (yellow icon + LEGACY pill, opens read-only flow editor), custom (blue pencil, free text), AI-suggested (✨)
+- **Flow deprecation path:** orange "Resolve more with AI Agent" callout shows while flows remain; each flow row keeps its completion-rate nudge ("Set up Shopping Assistant / Support Action instead") with clickable nav
+- **In-card "Add starter" menu** (bottom of the card, not page-level): From a Skill (opens searchable skill picker) / Write your own (inline editing row) / AI recommended (pulses the suggestions panel)
+- **"Recommended from your tickets" panel** inside the card: top questions AI Agent already automates well, with ticket volume + automation rate, one-click Add or Dismiss
+- **Live Wilson chat preview** unchanged from v1 — starters render as pills, clicking one simulates the AI conversation
+
+### Context
+
+Step 1 of the [Flows → AI Agent migration path](https://app.notion.com/p/gorgias/Flows-AI-Agent-Product-migration-path-3571ae2178f58148ab09d89452ffc05c) — replacing skill-mapped single-message chat flows (11.3% of flow volume) with skill-linked starters.
+
+---
+
+## Agent Behavior — Scope
 
 **File:** `scope-prototype.html` / `scope-prototype.jsx`
 
